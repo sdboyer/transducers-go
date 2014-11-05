@@ -23,6 +23,11 @@ func inc(v int) int {
 	return v + 1
 }
 
+// Basic Filterer function (true if even)
+func even(v int) bool {
+	return v%2 == 0
+}
+
 // basic direct map func
 func DirectMap(f Mapper, collection []int) []int {
 	newcoll := make([]int, len(collection))

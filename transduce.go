@@ -56,5 +56,15 @@ func DirectFilter(f Filterer, collection []int) []int {
 func MapThruReduce(f Mapper, collection []int) []int {
 	return Reduce(collection, func(accum interface{}, datum int) interface{} {
 		return append(accum.([]int), f(datum))
-	}, make([]int, 0, len(collection))).([]int)
+	}, make([]int, 0)).([]int)
+}
+
+func FilterThruReduce(f Filterer, collection []int) []int {
+	return Reduce(collection, func(accum interface{}, datum int) interface{} {
+		if f(datum) {
+			return append(accum.([]int), datum)
+		} else {
+			return accum
+		}
+	}, make([]int, 0)).([]int)
 }

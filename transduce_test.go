@@ -57,3 +57,27 @@ func TestFilterThruReduce(t *testing.T) {
 		}
 	}
 }
+
+func TestMapReducer(t *testing.T) {
+	res := Reduce(ints, MapFunc(inc), make([]int, 0)).([]int)
+
+	for k, v := range ints {
+		if res[k] != v+1 {
+			t.Error("Error on index", k, ": expected", v+1, "got", res[k])
+		}
+	}
+}
+
+func TestFilterReducer(t *testing.T) {
+	res := Reduce(ints, FilterFunc(even), make([]int, 0)).([]int)
+
+	if len(res) != len(evens) {
+		t.Error("Wrong length of result on direct filter")
+	}
+
+	for k, v := range evens {
+		if res[k] != v {
+			t.Error("Error on index", k, ": expected", v, "got", res[k])
+		}
+	}
+}

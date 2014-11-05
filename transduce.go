@@ -59,6 +59,7 @@ func MapThruReduce(f Mapper, collection []int) []int {
 	}, make([]int, 0)).([]int)
 }
 
+// filter, expressed directly through reduce
 func FilterThruReduce(f Filterer, collection []int) []int {
 	return Reduce(collection, func(accum interface{}, datum int) interface{} {
 		if f(datum) {
@@ -67,4 +68,22 @@ func FilterThruReduce(f Filterer, collection []int) []int {
 			return accum
 		}
 	}, make([]int, 0)).([]int)
+}
+
+// map, expressed indirectly through a returned reducer func
+func MapFunc(f Mapper) Reducer {
+	return func(accum interface{}, datum int) interface{} {
+		return append(accum.([]int), f(datum))
+	}
+}
+
+// filter, expressed indirectly through a returned reducer func
+func FilterFunc(f Filterer) Reducer {
+	return func(accum interface{}, datum int) interface{} {
+		if f(datum) {
+			return append(accum.([]int), datum)
+		} else {
+			return accum
+		}
+	}
 }

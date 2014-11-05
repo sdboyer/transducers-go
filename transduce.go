@@ -18,18 +18,20 @@ func Reduce(coll []int, f Reducer, input interface{}) interface{} {
 	return input
 }
 
-// Basic incrementer function
+// Basic Mapper function (increments by 1)
 func inc(v int) int {
 	return v + 1
 }
 
 // basic direct map func
 func DirectMap(f Mapper, collection []int) []int {
+	newcoll := make([]int, len(collection))
+
 	for k, v := range collection {
-		collection[k] = f(v)
+		newcoll[k] = f(v)
 	}
 
-	return collection
+	return newcoll
 }
 
 // basic direct filtering func
@@ -45,6 +47,9 @@ func DirectFilter(f Filterer, collection []int) []int {
 	return newcoll
 }
 
+// map, expressed directly through reduce
 func MapThruReduce(f Mapper, collection []int) []int {
-
+	return Reduce(collection, func(accum interface{}, datum int) interface{} {
+		return append(accum.([]int), f(datum))
+	}, make([]int, 0, len(collection))).([]int)
 }

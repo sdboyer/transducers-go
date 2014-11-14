@@ -6,17 +6,10 @@ type Reducer func(interface{}, int) interface{}
 
 //type Reducible func(collection []int, f Reducer, init interface{}) interface{}
 
-type Streamable interface {
-	AsStream() ValueStream
-}
-
 // This is an outer piece, so doesn't need a type - use em how you want
 // type Materializer func(Transducer, Iterator)
 
 type TransduceReceiver func(...Transducer)
-
-// The lowest-possible-denominator iteration model
-type ValueStream func() (value interface{}, done bool)
 
 type ReduceFunctor interface {
 	Reduced() bool
@@ -115,33 +108,6 @@ func FilterFunc(f Filterer) Reducer {
 		} else {
 			return accum
 		}
-	}
-}
-
-// Wrap an iterator up into a ValueStream func.
-func iteratorToValueStream(i Iterator) func() (value interface{}, done bool) {
-	return func() (interface{}, bool) {
-		if !i.Valid() {
-			return nil, true
-		}
-
-		// sad that defer has performance issues
-		//
-		// this approach signals termination to  the iterator when no longer valid
-		//defer func() {
-		//i.Next()
-		//if !i.Valid() {
-		//i.Done()
-		//}
-		//}()
-		//
-		// this approach just makes sure next gets called
-		// defer i.Next()
-
-		v := i.Current()
-		i.Next()
-
-		return v, i.Valid() // TODO this pops and seeks...kinda weird. fix later when it hurts
 	}
 }
 

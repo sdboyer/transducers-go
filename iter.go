@@ -1,6 +1,7 @@
 package transduce
 
 type Iterator interface {
+	//Rewind()
 	Current() (value interface{})
 	Next()
 	Valid() bool
@@ -28,3 +29,7 @@ func (i IntSliceIterator) Valid() (valid bool) {
 func (i IntSliceIterator) Done() {
 
 }
+
+//func (i IntSliceIterator) Rewind() {
+//i.pos = 0
+//}

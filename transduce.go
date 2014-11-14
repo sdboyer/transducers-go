@@ -6,8 +6,8 @@ type Reducer func(interface{}, int) interface{}
 
 //type Reducible func(collection []int, f Reducer, init interface{}) interface{}
 
-type Reducible interface {
-	Reduce(...Transducer)
+type Streamable interface {
+	AsStream() ValueStream
 }
 
 // This is an outer piece, so doesn't need a type - use em how you want
@@ -15,6 +15,7 @@ type Reducible interface {
 
 type TransduceReceiver func(...Transducer)
 
+// The lowest-possible-denominator iteration model
 type ValueStream func() (value interface{}, done bool)
 
 type ReduceFunctor interface {
@@ -117,19 +118,42 @@ func FilterFunc(f Filterer) Reducer {
 	}
 }
 
-func iteratorToValueStream(i Iterator) (value interface{}, done bool) {
+// Wrap an iterator up into a ValueStream func.
+func iteratorToValueStream(i Iterator) func() (value interface{}, done bool) {
+	return func() (interface{}, bool) {
+		if !i.Valid() {
+			return nil, true
+		}
 
+		// sad that defer has performance issues
+		//
+		// this approach signals termination to  the iterator when no longer valid
+		//defer func() {
+		//i.Next()
+		//if !i.Valid() {
+		//i.Done()
+		//}
+		//}()
+		//
+		// this approach just makes sure next gets called
+		// defer i.Next()
+
+		v := i.Current()
+		i.Next()
+
+		return v, i.Valid() // TODO this pops and seeks...kinda weird. fix later when it hurts
+	}
 }
 
 // Bind a function to the given collection that will allow traversal for reducing
-func MakeReduce(collection interface{}) Iterator {
+func MakeReduce(collection interface{}) ValueStream {
 	// If the structure already provides a reducing method, just return that.
-	if c, ok := collection.(Reducible); ok {
-		return c.Reduce // use method pointer as reducing function, omg teh shiz
+	if c, ok := collection.(Streamable); ok {
+		return c.AsStream()
 	}
 	switch c := collection.(type) {
 	case []int:
-		return IntSliceIterator{slice: c}
+		return iteratorToValueStream(IntSliceIterator{slice: c})
 	default:
 		panic("not supported yet")
 	}

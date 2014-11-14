@@ -1,14 +1,22 @@
 package transduce
 
-import (
-	"fmt"
-	"testing"
-)
-
-var fml = fmt.Println
+import "testing"
 
 var ints = []int{1, 2, 3, 4, 5}
 var evens = []int{2, 4}
+
+func intSliceEquals(a []int, b []int, t *testing.T) {
+	if len(a) != len(b) {
+		t.Error("Slices not even length")
+	}
+
+	for k, v := range a {
+		if b[k] != v {
+			t.Error("Error on index", k, ": expected", v, "got", b[k])
+		}
+	}
+
+}
 
 func TestDirectMap(t *testing.T) {
 	res := DirectMap(inc, ints)
@@ -80,4 +88,12 @@ func TestFilterReducer(t *testing.T) {
 			t.Error("Error on index", k, ": expected", v, "got", res[k])
 		}
 	}
+}
+
+func TestTransduceMF(t *testing.T) {
+	mf := Seq(MakeReduce(ints), make([]int, 0), Map(inc), Filter(even))
+	fm := Seq(MakeReduce(ints), make([]int, 0), Filter(even), Map(inc))
+
+	intSliceEquals([]int{2, 4, 6}, mf, t)
+	intSliceEquals([]int{3, 5}, fm, t)
 }

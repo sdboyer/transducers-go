@@ -1,6 +1,8 @@
 package transduce
 
-// The lowest-possible-denominator iteration concept
+// The lowest-possible-denominator iteration concept. It's kinda
+// terrible because it must inherently inspect both the current and
+// next value on each call.
 type ValueStream func() (value interface{}, done bool)
 
 type Streamable interface {
@@ -11,6 +13,7 @@ type Streamable interface {
 func iteratorToValueStream(i Iterator) func() (value interface{}, done bool) {
 	return func() (interface{}, bool) {
 		if !i.Valid() {
+			i.Done()
 			return nil, true
 		}
 
@@ -30,7 +33,7 @@ func iteratorToValueStream(i Iterator) func() (value interface{}, done bool) {
 		v := i.Current()
 		i.Next()
 
-		return v, i.Valid() // TODO this pops and seeks...kinda weird. fix later when it hurts
+		return v, false // TODO this pops and seeks...kinda weird. fix later when it hurts
 	}
 }
 
@@ -47,20 +50,22 @@ type IntSliceIterator struct {
 	pos   int
 }
 
-func (i IntSliceIterator) Current() interface{} {
+func (i *IntSliceIterator) Current() interface{} {
+	//fml("Current, current value:", i.slice[i.pos])
 	return i.slice[i.pos]
 }
 
-func (i IntSliceIterator) Next() {
+func (i *IntSliceIterator) Next() {
 	// atomicity
+	//fml("Next, old position:", i.pos)
 	i.pos++
 }
 
-func (i IntSliceIterator) Valid() (valid bool) {
+func (i *IntSliceIterator) Valid() (valid bool) {
 	return i.pos < len(i.slice)
 }
 
-func (i IntSliceIterator) Done() {
+func (i *IntSliceIterator) Done() {
 
 }
 

@@ -1,5 +1,9 @@
 package transduce
 
+import "fmt"
+
+var fml = fmt.Println
+
 //type Reducer func(accum interface{}, input interface{}) (result interface{})
 //type Reducer func(accum int, input int) int
 type Reducer func(interface{}, int) interface{}
@@ -119,9 +123,9 @@ func MakeReduce(collection interface{}) ValueStream {
 	}
 	switch c := collection.(type) {
 	case []int:
-		return iteratorToValueStream(IntSliceIterator{slice: c})
+		return iteratorToValueStream(&IntSliceIterator{slice: c})
 	default:
-		panic("not supported yet")
+		panic("not supported...yet")
 	}
 }
 
@@ -130,9 +134,43 @@ func Compose(funcs ...Transducer) TransductionStack {
 	return funcs
 }
 
+func Seq(vs ValueStream, init []int, tlist ...Transducer) []int {
+	//fml(tlist)
+	// Final reducing func; appends to our list
+	t := func(accum interface{}, value int) interface{} {
+		//fml("Seq inner:", accum, value)
+		return append(accum.([]int), value)
+	}
+
+	// Walk backwards through transducer list to assemble in
+	// correct order
+	for i := len(tlist) - 1; i >= 0; i-- {
+		//fml(tlist[i])
+		t = tlist[i](t)
+	}
+
+	var v interface{}
+	var done bool
+	var ret interface{} = init
+
+	for {
+		v, done = vs()
+		if done {
+			break
+		}
+
+		////fml("Main loop:", v)
+		// weird that we do nothing here
+		ret = t(ret, v.(int))
+	}
+
+	return ret.([]int)
+}
+
 func Map(f Mapper) Transducer {
 	return func(r Reducer) Reducer {
 		return func(accum interface{}, value int) interface{} {
+			////fml("Map:", accum, value)
 			return r(accum, f(value))
 		}
 	}
@@ -141,6 +179,7 @@ func Map(f Mapper) Transducer {
 func Filter(f Filterer) Transducer {
 	return func(r Reducer) Reducer {
 		return func(accum interface{}, value int) interface{} {
+			//fml("Filter:", accum, value)
 			if f(value) {
 				return r(accum, value)
 			} else {

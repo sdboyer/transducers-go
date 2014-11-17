@@ -1,6 +1,9 @@
 package transduce
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 var ints = []int{1, 2, 3, 4, 5}
 var evens = []int{2, 4}
@@ -113,4 +116,14 @@ func TestTransduceMapFilterMapcatDedupe(t *testing.T) {
 	// Dedupe is stateful. Do it twice to demonstrate that's handled
 	result2 := Seq(MakeReduce(ints), make([]int, 0), xform...)
 	intSliceEquals([]int{0, 1, 2, 3, 4}, result2, t)
+}
+
+func TestTransduceChunk(t *testing.T) {
+	xform := []Transducer{Chunk(3)}
+
+	result := Seq(Range(6), make([]int, 0), xform...)
+	fmt.Println(result)
+
+	//intSliceEquals(result.([][]int)[0], []int{0, 1, 2}, t)
+	//intSliceEquals(result.([][]int)[1], []int{3, 4, 5}, t)
 }

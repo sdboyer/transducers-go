@@ -54,15 +54,20 @@ func even(v int) bool {
 }
 
 // Dumb little thing to emulate clojure's range behavior
-func Range(limit interface{}) ValueStream {
-	l := limit.(int)
+func t_range(l int) []int {
 	slice := make([]int, l)
 
 	for i := 0; i < l; i++ {
 		slice[i] = i
 	}
 
-	return MakeReduce(slice) // lazy and inefficient, do it directly
+	return slice
+}
+
+// Wraps t_range into a ValueStream
+func Range(limit interface{}) ValueStream {
+	// lazy and inefficient to use MakeReduce here, do it directly
+	return MakeReduce(t_range(limit.(int)))
 }
 
 // Bind a function to the given collection that will allow traversal for reducing
@@ -196,6 +201,35 @@ func Dedupe() TransducerFunc {
 
 			seen = append(seen, val)
 			return r(accum, val)
+		}
+	}
+}
+
+// Condense the traversed collection by partitioning it into
+// chunks of []interface{} of the given length.
+//
+// Here's one place we sorely feel the lack of algebraic types.
+//
+// Stateful.
+func Chunk(length int) TransducerFunc {
+	if length < 1 {
+		panic("chunks must be at least one element in size")
+	}
+
+	return func(r Reducer) Reducer {
+		// TODO look into most memory-savvy ways of doing this
+		coll := make([]interface{}, 0, length)
+		var count int
+		return func(accum interface{}, val int) interface{} {
+			coll[count] = val
+			count++
+
+			if count == length {
+				count = 0
+				return r(accum, copy(coll, make([]interface{}, length, length)))
+			} else {
+				return accum
+			}
 		}
 	}
 }

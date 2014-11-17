@@ -103,3 +103,14 @@ func TestTransduceMapFilterMapcat(t *testing.T) {
 
 	intSliceEquals([]int{0, 1, 2, 0, 1, 2, 3, 4}, result, t)
 }
+
+func TestTransduceMapFilterMapcatDedupe(t *testing.T) {
+	xform := []Transducer{Filter(even), Map(inc), Mapcat(Range), Dedupe()}
+
+	result := Seq(MakeReduce(ints), make([]int, 0), xform...)
+	intSliceEquals([]int{0, 1, 2, 3, 4}, result, t)
+
+	// Dedupe is stateful. Do it twice to demonstrate that's handled
+	result2 := Seq(MakeReduce(ints), make([]int, 0), xform...)
+	intSliceEquals([]int{0, 1, 2, 3, 4}, result2, t)
+}

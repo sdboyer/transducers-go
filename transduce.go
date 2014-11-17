@@ -166,3 +166,26 @@ func Mapcat(f Exploder) Transducer {
 		}
 	}
 }
+
+// Dedupe is a particular type of filter, but its statefulness
+// means we need to treat it differently and can't reuse Filter
+func Dedupe() Transducer {
+	// Statefulness is encapsulated in the transducer function - when
+	// a materializing function calls the transducer, it produces a
+	// fresh state that lives only as long as that run.
+	return func(r Reducer) Reducer {
+		// TODO Slice is fine for prototype, but should replace with
+		// type-appropriate search tree later
+		seen := make([]interface{}, 0)
+		return func(accum interface{}, val int) interface{} {
+			for _, v := range seen {
+				if val == v {
+					return accum
+				}
+			}
+
+			seen = append(seen, val)
+			return r(accum, val)
+		}
+	}
+}

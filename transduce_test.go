@@ -97,3 +97,9 @@ func TestTransduceMF(t *testing.T) {
 	intSliceEquals([]int{2, 4, 6}, mf, t)
 	intSliceEquals([]int{3, 5}, fm, t)
 }
+
+func TestTransduceMapFilterMapcat(t *testing.T) {
+	result := Seq(MakeReduce(ints), make([]int, 0), Filter(even), Map(inc), Mapcat(Range))
+
+	intSliceEquals([]int{0, 1, 2, 0, 1, 2, 3, 4}, result, t)
+}

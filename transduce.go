@@ -9,12 +9,22 @@ type Reducer func(interface{}, int) interface{}
 // This is an outer piece, so doesn't need a type - use em how you want
 // type Materializer func(Transducer, Iterator)
 
-type Transducer func(Reducer) Reducer
+// Transducers are an interface, but...
+type Transducer interface {
+	Transduce(Reducer) Reducer
+}
+
+// We also provide an easy way to express them as pure functions
+type TransducerFunc func(Reducer) Reducer
+
+func (f TransducerFunc) Transduce(r Reducer) Reducer {
+	return f(r)
+}
 
 type Mapper func(int) interface{}
 type Filterer func(int) bool
 
-const dbg = true
+const dbg = false
 
 func fml(v ...interface{}) {
 	if dbg {
@@ -83,7 +93,7 @@ func Seq(vs ValueStream, init []int, tlist ...Transducer) []int {
 	// correct order
 	for i := len(tlist) - 1; i >= 0; i-- {
 		fml(tlist[i])
-		t = tlist[i](t)
+		t = tlist[i].Transduce(t)
 	}
 
 	var v interface{}
@@ -104,7 +114,7 @@ func Seq(vs ValueStream, init []int, tlist ...Transducer) []int {
 	return ret.([]int)
 }
 
-func Map(f Mapper) Transducer {
+func Map(f Mapper) TransducerFunc {
 	return func(r Reducer) Reducer {
 		return func(accum interface{}, value int) interface{} {
 			fml("Map:", accum, value)
@@ -113,7 +123,7 @@ func Map(f Mapper) Transducer {
 	}
 }
 
-func Filter(f Filterer) Transducer {
+func Filter(f Filterer) TransducerFunc {
 	return func(r Reducer) Reducer {
 		return func(accum interface{}, value int) interface{} {
 			fml("Filter:", accum, value)
@@ -143,7 +153,7 @@ func Append(r Reducer) Reducer {
 // Mapcat first runs an exploder, then ''concats' results by
 // passing each individual value along to the next transducer
 // in the stack.
-func Mapcat(f Exploder) Transducer {
+func Mapcat(f Exploder) TransducerFunc {
 	return func(r Reducer) Reducer {
 		return func(accum interface{}, value int) interface{} {
 			fml("Processing explode val:", value)
@@ -169,7 +179,7 @@ func Mapcat(f Exploder) Transducer {
 
 // Dedupe is a particular type of filter, but its statefulness
 // means we need to treat it differently and can't reuse Filter
-func Dedupe() Transducer {
+func Dedupe() TransducerFunc {
 	// Statefulness is encapsulated in the transducer function - when
 	// a materializing function calls the transducer, it produces a
 	// fresh state that lives only as long as that run.

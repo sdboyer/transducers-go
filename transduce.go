@@ -24,7 +24,7 @@ func (f TransducerFunc) Transduce(r Reducer) Reducer {
 type Mapper func(int) interface{}
 type Filterer func(int) bool
 
-const dbg = false
+const dbg = true
 
 func fml(v ...interface{}) {
 	if dbg {
@@ -218,9 +218,10 @@ func Chunk(length int) TransducerFunc {
 
 	return func(r Reducer) Reducer {
 		// TODO look into most memory-savvy ways of doing this
-		coll := make([]interface{}, 0, length)
+		coll := make([]interface{}, length, length)
 		var count int
 		return func(accum interface{}, val int) interface{} {
+			fml("Chunk count: ", count, "coll contents: ", coll)
 			coll[count] = val
 			count++
 

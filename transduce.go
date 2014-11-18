@@ -2,10 +2,6 @@ package transduce
 
 import "fmt"
 
-//var fml = fmt.Println
-
-type Reducer func(interface{}, int) interface{}
-
 // This is an outer piece, so doesn't need a type - use em how you want
 // type Materializer func(Transducer, Iterator)
 
@@ -21,8 +17,8 @@ func (f TransducerFunc) Transduce(r Reducer) Reducer {
 	return f(r)
 }
 
-type Mapper func(int) interface{}
-type Filterer func(int) bool
+type Mapper func(interface{}) interface{}
+type Filterer func(interface{}) bool
 
 const dbg = true
 
@@ -37,20 +33,20 @@ func fml(v ...interface{}) {
 // output may be a collection of the input type, or may not.
 type Exploder func(interface{}) ValueStream
 
-type ReducingFunc func(accum interface{}, val interface{}) (result interface{})
+type Reducer func(accum interface{}, value interface{}) (result interface{})
 
-func Sum(accum interface{}, val int) (result interface{}) {
-	return accum.(int) + val
+func Sum(accum interface{}, val interface{}) (result interface{}) {
+	return accum.(int) + val.(int)
 }
 
 // Basic Mapper function (increments by 1)
-func inc(v int) interface{} {
-	return v + 1
+func inc(value interface{}) interface{} {
+	return value.(int) + 1
 }
 
 // Basic Filterer function (true if even)
-func even(v int) bool {
-	return v%2 == 0
+func even(value interface{}) bool {
+	return value.(int)%2 == 0
 }
 
 // Dumb little thing to emulate clojure's range behavior
@@ -85,8 +81,8 @@ func MakeReduce(collection interface{}) ValueStream {
 	}
 }
 
-func Identity(accum interface{}, val int) interface{} {
-	return val
+func Identity(accum interface{}, value interface{}) interface{} {
+	return value
 }
 
 func Seq(vs ValueStream, init []int, tlist ...Transducer) []int {
@@ -121,7 +117,7 @@ func Seq(vs ValueStream, init []int, tlist ...Transducer) []int {
 
 func Map(f Mapper) TransducerFunc {
 	return func(r Reducer) Reducer {
-		return func(accum interface{}, value int) interface{} {
+		return func(accum interface{}, value interface{}) interface{} {
 			fml("Map:", accum, value)
 			return r(accum, f(value).(int))
 		}
@@ -130,7 +126,7 @@ func Map(f Mapper) TransducerFunc {
 
 func Filter(f Filterer) TransducerFunc {
 	return func(r Reducer) Reducer {
-		return func(accum interface{}, value int) interface{} {
+		return func(accum interface{}, value interface{}) interface{} {
 			fml("Filter:", accum, value)
 			if f(value) {
 				return r(accum, value)
@@ -142,9 +138,9 @@ func Filter(f Filterer) TransducerFunc {
 }
 
 func Append(r Reducer) Reducer {
-	return func(accum interface{}, val int) interface{} {
+	return func(accum interface{}, value interface{}) interface{} {
 		fml(accum)
-		switch v := r(accum, val).(type) {
+		switch v := r(accum, value).(type) {
 		case []int:
 			return append(accum.([]int), v...)
 		case int:
@@ -160,7 +156,7 @@ func Append(r Reducer) Reducer {
 // in the stack.
 func Mapcat(f Exploder) TransducerFunc {
 	return func(r Reducer) Reducer {
-		return func(accum interface{}, value int) interface{} {
+		return func(accum interface{}, value interface{}) interface{} {
 			fml("Processing explode val:", value)
 			stream := f(value)
 
@@ -192,15 +188,15 @@ func Dedupe() TransducerFunc {
 		// TODO Slice is fine for prototype, but should replace with
 		// type-appropriate search tree later
 		seen := make([]interface{}, 0)
-		return func(accum interface{}, val int) interface{} {
+		return func(accum interface{}, value interface{}) interface{} {
 			for _, v := range seen {
-				if val == v {
+				if value == v {
 					return accum
 				}
 			}
 
-			seen = append(seen, val)
-			return r(accum, val)
+			seen = append(seen, value)
+			return r(accum, value)
 		}
 	}
 }
@@ -220,9 +216,9 @@ func Chunk(length int) TransducerFunc {
 		// TODO look into most memory-savvy ways of doing this
 		coll := make([]interface{}, length, length)
 		var count int
-		return func(accum interface{}, val int) interface{} {
+		return func(accum interface{}, value interface{}) interface{} {
 			fml("Chunk count: ", count, "coll contents: ", coll)
-			coll[count] = val
+			coll[count] = value
 			count++
 
 			if count == length {

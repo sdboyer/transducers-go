@@ -39,6 +39,14 @@ func Sum(accum interface{}, val interface{}) (result interface{}) {
 	return accum.(int) + val.(int)
 }
 
+func sum(vs ValueStream) (total int) {
+	vs.Each(func(value interface{}) {
+		total += value.(int)
+	})
+
+	return
+}
+
 // Basic Mapper function (increments by 1)
 func inc(value interface{}) interface{} {
 	return value.(int) + 1
@@ -165,12 +173,18 @@ func Filter(f Filterer) TransducerFunc {
 
 func Append(r Reducer) Reducer {
 	return func(accum interface{}, value interface{}) interface{} {
-		fml(accum)
+		fml("Appending", value, "onto", accum)
 		switch v := r(accum, value).(type) {
 		case []int:
 			return append(accum.([]int), v...)
 		case int:
 			return append(accum.([]int), v)
+		case ValueStream:
+			flattenValueStream(v).Each(func(value interface{}) {
+				fml("*actually* appending ", value, "onto", accum)
+				accum = append(accum.([]int), value.(int))
+			})
+			return accum
 		default:
 			panic("not supported")
 		}
@@ -196,7 +210,7 @@ func Mapcat(f Exploder) TransducerFunc {
 				}
 				fml("Calling next t on val:", v, "accum is:", accum)
 
-				accum = r(accum, v.(int))
+				accum = r(accum, v)
 			}
 
 			return accum
@@ -259,9 +273,9 @@ func Chunk(length int) TransducerFunc {
 	}
 }
 
-// Condense the traversed collection by partitioning it into chunks of
-// ValueStreams. A new contiguous stream is created every time the injected
-// filter function returns true.
+// Condense the traversed collection by partitioning it into chunks,
+// represented by ValueStreams. A new contiguous stream is created every time
+// the injected filter function returns true.
 func ChunkBy(f Filterer) TransducerFunc {
 	return func(r Reducer) Reducer {
 		var coll []interface{}
@@ -271,9 +285,7 @@ func ChunkBy(f Filterer) TransducerFunc {
 				coll = append(coll, value)
 				return accum
 			} else {
-				pass := coll
-				coll = nil
-				return r(accum, pass)
+				return r(accum, coll)
 			}
 		}
 	}

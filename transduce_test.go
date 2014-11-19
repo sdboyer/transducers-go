@@ -118,12 +118,21 @@ func TestTransduceMapFilterMapcatDedupe(t *testing.T) {
 	intSliceEquals([]int{0, 1, 2, 3, 4}, result2, t)
 }
 
-func TestTransduceChunk(t *testing.T) {
-	xform := []Transducer{Chunk(3)}
-
+func TestTransduceChunkFlatten(t *testing.T) {
+	xform := []Transducer{Chunk(3), Mapcat(Flatten)}
 	result := Seq(Range(6), make([]int, 0), xform...)
+	// TODO crappy test b/c the steps are logical inversions - need to improv on Seq for better test
+
+	intSliceEquals(([]int{0, 1, 2, 3, 4, 5}), result, t)
+}
+
+func TestTransduceChunkChunkByFlatten(t *testing.T) {
+	chunker := func(value interface{}) bool {
+		return sum(value.(ValueStream)) > 7
+	}
+	xform := []Transducer{Chunk(3), ChunkBy(chunker), Mapcat(Flatten)}
+	result := Seq(Range(22), make([]int, 0), xform...)
 	fmt.Println(result)
 
-	//intSliceEquals(result.([][]int)[0], []int{0, 1, 2}, t)
-	//intSliceEquals(result.([][]int)[1], []int{3, 4, 5}, t)
+	intSliceEquals(t_range(22), result, t)
 }

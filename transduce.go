@@ -60,6 +60,32 @@ func t_range(l int) []int {
 	return slice
 }
 
+// Flattens arbitrarily deep datastructures into a single ValueStream.
+func Flatten(value interface{}) ValueStream {
+	switch v := value.(type) {
+	case ValueStream:
+		return flattenValueStream(v)
+	case []interface{}:
+		// TODO maybe detect ValueStreams here, too, but probably better to just be consistent
+		return ValueSlice(v).AsStream()
+	case []int:
+		return MakeReduce(v)
+	case int, interface{}:
+		var done bool
+		// create single-eleement value stream
+		return func() (interface{}, bool) {
+			if done {
+				return nil, true
+			} else {
+				done = true
+				return v, false
+			}
+		}
+	default:
+		panic("not supported")
+	}
+}
+
 // Wraps t_range into a ValueStream
 func Range(limit interface{}) ValueStream {
 	// lazy and inefficient to use MakeReduce here, do it directly
@@ -151,7 +177,7 @@ func Append(r Reducer) Reducer {
 	}
 }
 
-// Mapcat first runs an exploder, then ''concats' results by
+// Mapcat first runs an exploder, then 'concats' results by
 // passing each individual value along to the next transducer
 // in the stack.
 func Mapcat(f Exploder) TransducerFunc {

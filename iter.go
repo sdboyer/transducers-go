@@ -18,32 +18,6 @@ func (vs ValueStream) Each(f func(interface{})) {
 	}
 }
 
-// TODO maybe do this as a linked list instead?
-type CompoundValueStream []ValueStream
-
-func (cvs CompoundValueStream) AsStream() ValueStream {
-	var pos int
-	var f ValueStream
-
-	f = func() (value interface{}, done bool) {
-		value, done = cvs[pos]() // TODO superdee duper not threadsafe
-
-		if !done {
-			return value, done
-		}
-
-		// recurse through the streams till we get a value, or we hit the end
-		pos++
-		if pos >= len(cvs) { // no more streams
-			return nil, true
-		}
-
-		return f()
-	}
-
-	return f
-}
-
 // Takes a ValueStream that (presumably) produces other ValueStreams, and,
 // ostensibly for the caller, flattens them together into a single ValueStream
 // by walking depth-first through an arbitrarily deep set of ValueStreams until

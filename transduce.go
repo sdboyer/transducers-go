@@ -240,7 +240,7 @@ func Chunk(length int) TransducerFunc {
 
 	return func(r Reducer) Reducer {
 		// TODO look into most memory-savvy ways of doing this
-		coll := make([]interface{}, length, length)
+		coll := make(ValueSlice, length, length)
 		var count int
 		return func(accum interface{}, value interface{}) interface{} {
 			fml("Chunk count: ", count, "coll contents: ", coll)
@@ -249,9 +249,31 @@ func Chunk(length int) TransducerFunc {
 
 			if count == length {
 				count = 0
-				return r(accum, copy(coll, make([]interface{}, length, length)))
+				newcoll := make(ValueSlice, length, length)
+				copy(newcoll, coll)
+				return r(accum, newcoll.AsStream())
 			} else {
 				return accum
+			}
+		}
+	}
+}
+
+// Condense the traversed collection by partitioning it into chunks of
+// ValueStreams. A new contiguous stream is created every time the injected
+// filter function returns true.
+func ChunkBy(f Filterer) TransducerFunc {
+	return func(r Reducer) Reducer {
+		var coll []interface{}
+		return func(accum interface{}, value interface{}) interface{} {
+			fml("Chunk size: ", len(coll), "coll contents: ", coll)
+			if !f(value) {
+				coll = append(coll, value)
+				return accum
+			} else {
+				pass := coll
+				coll = nil
+				return r(accum, pass)
 			}
 		}
 	}

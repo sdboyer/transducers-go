@@ -131,8 +131,8 @@ func TestTransduceChunkChunkByFlatten(t *testing.T) {
 		return sum(value.(ValueStream)) > 7
 	}
 	xform := []Transducer{Chunk(3), ChunkBy(chunker), Mapcat(Flatten)}
-	result := Seq(Range(22), make([]int, 0), xform...)
+	result := Seq(Range(6), make([]int, 0), xform...)
 	fmt.Println(result)
 
-	intSliceEquals(t_range(22), result, t)
+	intSliceEquals(t_range(6), result, t)
 }

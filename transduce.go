@@ -8,6 +8,7 @@ import "fmt"
 // Transducers are an interface, but...
 type Transducer interface {
 	Transduce(Reducer) Reducer
+	Flush()
 }
 
 // We also provide an easy way to express them as pure functions
@@ -41,8 +42,10 @@ func Sum(accum interface{}, val interface{}) (result interface{}) {
 
 func sum(vs ValueStream) (total int) {
 	vs.Each(func(value interface{}) {
+		fml("SUM: total", total)
 		total += value.(int)
 	})
+	fml("SUM: final total", total)
 
 	return
 }
@@ -152,7 +155,7 @@ func Seq(vs ValueStream, init []int, tlist ...Transducer) []int {
 func Map(f Mapper) TransducerFunc {
 	return func(r Reducer) Reducer {
 		return func(accum interface{}, value interface{}) interface{} {
-			fml("Map:", accum, value)
+			fml("MAP: accum is", accum, "value is", value)
 			return r(accum, f(value).(int))
 		}
 	}
@@ -161,7 +164,7 @@ func Map(f Mapper) TransducerFunc {
 func Filter(f Filterer) TransducerFunc {
 	return func(r Reducer) Reducer {
 		return func(accum interface{}, value interface{}) interface{} {
-			fml("Filter:", accum, value)
+			fml("FILTER: accum is", accum, "value is", value)
 			if f(value) {
 				return r(accum, value)
 			} else {
@@ -173,7 +176,7 @@ func Filter(f Filterer) TransducerFunc {
 
 func Append(r Reducer) Reducer {
 	return func(accum interface{}, value interface{}) interface{} {
-		fml("Appending", value, "onto", accum)
+		fml("APPEND: Appending", value, "onto", accum)
 		switch v := r(accum, value).(type) {
 		case []int:
 			return append(accum.([]int), v...)
@@ -181,7 +184,7 @@ func Append(r Reducer) Reducer {
 			return append(accum.([]int), v)
 		case ValueStream:
 			flattenValueStream(v).Each(func(value interface{}) {
-				fml("*actually* appending ", value, "onto", accum)
+				fml("APPEND: *actually* appending ", value, "onto", accum)
 				accum = append(accum.([]int), value.(int))
 			})
 			return accum
@@ -197,7 +200,7 @@ func Append(r Reducer) Reducer {
 func Mapcat(f Exploder) TransducerFunc {
 	return func(r Reducer) Reducer {
 		return func(accum interface{}, value interface{}) interface{} {
-			fml("Processing explode val:", value)
+			fml("MAPCAT: Processing explode val:", value)
 			stream := f(value)
 
 			var v interface{}
@@ -208,7 +211,7 @@ func Mapcat(f Exploder) TransducerFunc {
 				if done {
 					break
 				}
-				fml("Calling next t on val:", v, "accum is:", accum)
+				fml("MAPCAT: Calling next t on val:", v, "accum is:", accum)
 
 				accum = r(accum, v)
 			}
@@ -257,7 +260,7 @@ func Chunk(length int) TransducerFunc {
 		coll := make(ValueSlice, length, length)
 		var count int
 		return func(accum interface{}, value interface{}) interface{} {
-			fml("Chunk count: ", count, "coll contents: ", coll)
+			fml("CHUNK: Chunk count: ", count, "coll contents: ", coll)
 			coll[count] = value
 			count++
 
@@ -265,6 +268,7 @@ func Chunk(length int) TransducerFunc {
 				count = 0
 				newcoll := make(ValueSlice, length, length)
 				copy(newcoll, coll)
+				fml("CHUNK: passing val to next td:", coll)
 				return r(accum, newcoll.AsStream())
 			} else {
 				return accum
@@ -280,13 +284,41 @@ func ChunkBy(f Filterer) TransducerFunc {
 	return func(r Reducer) Reducer {
 		var coll []interface{}
 		return func(accum interface{}, value interface{}) interface{} {
-			fml("Chunk size: ", len(coll), "coll contents: ", coll)
-			if !f(value) {
-				coll = append(coll, value)
-				return accum
+			fml("CHUNKBY: Chunk size: ", len(coll), "coll contents: ", coll)
+			var vals ValueSlice
+			if vs, ok := value.(ValueStream); ok {
+				fml("CHUNKBY: operating on ValueStream")
+				// TODO this SUUUUUCKS, we have to duplicate the stream
+				// the fact that the logic splits like this is indicative of a deeper problem
+				vs.Each(func(v interface{}) {
+					vals = append(vals, v)
+				})
+
+				fml("CHUNKBY: collected vals:", vals)
+
+				if !f(vals.AsStream()) {
+					fml("CHUNKBY: chunk unfinished; appending these vals to coll:", vals)
+					coll = append(coll, vals.AsStream())
+				} else {
+					fml("CHUNKBY: passing value streams to next td:", coll)
+					accum = r(accum, coll)
+					coll = nil
+					coll = append(coll, vals.AsStream())
+				}
 			} else {
-				return r(accum, coll)
+				fml("CHUNKBY: operating on non-ValueStream")
+				if !f(value) {
+					fml("CHUNKBY: chunk unfinished; appending this val to coll:", value)
+					coll = append(coll, value)
+				} else {
+					fml("CHUNKBY: passing coll to next td:", coll)
+					accum = r(accum, coll)
+					coll = nil // TODO erm...correct way to zero out a slice?
+					coll = append(coll, value)
+				}
 			}
+
+			return accum
 		}
 	}
 }

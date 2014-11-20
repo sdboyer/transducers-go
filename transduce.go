@@ -184,6 +184,8 @@ func Seq(vs ValueStream, init []int, tlist ...Transducer) []int {
 		ret = t.Reduce(ret, v.(int))
 	}
 
+	ret = t.Complete(ret)
+
 	return ret.([]int)
 }
 

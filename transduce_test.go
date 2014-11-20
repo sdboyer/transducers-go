@@ -132,3 +132,13 @@ func TestTransduceChunkChunkByFlatten(t *testing.T) {
 
 	intSliceEquals(t_range(19), result, t)
 }
+
+func TestTransduceSample(t *testing.T) {
+	result := Seq(Range(12), make([]int, 0), RandomSample(1))
+	intSliceEquals(t_range(12), result, t)
+
+	result2 := Seq(Range(12), make([]int, 0), RandomSample(0))
+	if len(result2) != 0 {
+		t.Error("Random sampling with 0 ρ should filter out all results")
+	}
+}

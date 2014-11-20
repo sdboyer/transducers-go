@@ -30,10 +30,10 @@ type ReduceStep interface {
 // We also provide an easy way to express transducers as pure functions. Sig is
 // still just focused on the Reducer funcs, though, because the work of supporting
 // supporting Complete() is pushed to the pureReducer, which
-// PureTransducerFunc.Transduce() attaches.
-type PureTransducerFunc func(Reducer) Reducer
+// PureFuncTransducer.Transduce() attaches.
+type PureFuncTransducer func(Reducer) Reducer
 
-func (f PureTransducerFunc) Transduce(r ReduceStep) ReduceStep {
+func (f PureFuncTransducer) Transduce(r ReduceStep) ReduceStep {
 	return pureReducer{reduce: f(r.Reduce), complete: r.Complete}
 }
 
@@ -189,7 +189,7 @@ func Seq(vs ValueStream, init []int, tlist ...Transducer) []int {
 	return ret.([]int)
 }
 
-func Map(f Mapper) PureTransducerFunc {
+func Map(f Mapper) PureFuncTransducer {
 	return func(r Reducer) Reducer {
 		return func(accum interface{}, value interface{}) interface{} {
 			fml("MAP: accum is", accum, "value is", value)
@@ -198,7 +198,7 @@ func Map(f Mapper) PureTransducerFunc {
 	}
 }
 
-func Filter(f Filterer) PureTransducerFunc {
+func Filter(f Filterer) PureFuncTransducer {
 	return func(r Reducer) Reducer {
 		return func(accum interface{}, value interface{}) interface{} {
 			fml("FILTER: accum is", accum, "value is", value)
@@ -234,7 +234,7 @@ func Append(r Reducer) Reducer {
 // Mapcat first runs an exploder, then 'concats' results by
 // passing each individual value along to the next transducer
 // in the stack.
-func Mapcat(f Exploder) PureTransducerFunc {
+func Mapcat(f Exploder) PureFuncTransducer {
 	return func(r Reducer) Reducer {
 		return func(accum interface{}, value interface{}) interface{} {
 			fml("MAPCAT: Processing explode val:", value)
@@ -260,7 +260,9 @@ func Mapcat(f Exploder) PureTransducerFunc {
 
 // Dedupe is a particular type of filter, but its statefulness
 // means we need to treat it differently and can't reuse Filter
-func Dedupe() PureTransducerFunc {
+//
+// TODO any reason to move this to its own struct?
+func Dedupe() PureFuncTransducer {
 	// Statefulness is encapsulated in the transducer function - when
 	// a materializing function calls the transducer, it produces a
 	// fresh state that lives only as long as that run.
@@ -403,7 +405,7 @@ func (t *chunkBy) Complete(accum interface{}) interface{} {
 
 // Passes the received value along to the next transducer, with the
 // given probability.
-func RandomSample(ρ float64) PureTransducerFunc {
+func RandomSample(ρ float64) PureFuncTransducer {
 	if ρ < 0.0 || ρ > 1.0 {
 		panic("ρ must be in the range [0.0,1.0].")
 	}

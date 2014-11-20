@@ -5,20 +5,51 @@ import (
 	"math/rand"
 )
 
-// This is an outer piece, so doesn't need a type - use em how you want
-// type Materializer func(Transducer, Iterator)
+// The master signature: a reducing step function.
+type Reducer func(accum interface{}, value interface{}) (result interface{})
 
 // Transducers are an interface, but...
 type Transducer interface {
-	Transduce(Reducer) Reducer
-	Flush()
+	Transduce(ReduceStep) ReduceStep
 }
 
-// We also provide an easy way to express them as pure functions
-type TransducerFunc func(Reducer) Reducer
+type TransducerFunc func(ReduceStep) ReduceStep
 
-func (f TransducerFunc) Transduce(r Reducer) Reducer {
+func (f TransducerFunc) Transduce(r ReduceStep) ReduceStep {
 	return f(r)
+}
+
+type ReduceStep interface {
+	// The primary reducing step function, called during normal operation.
+	Reduce(accum interface{}, value interface{}) (result interface{})
+	// Complete is called when the input has been exhausted; stateful transducers
+	// should flush any held state (e.g. values awaiting a full chunk) through here.
+	Complete(accum interface{}) (result interface{})
+}
+
+// We also provide an easy way to express transducers as pure functions. Sig is
+// still just focused on the Reducer funcs, though, because the work of supporting
+// supporting Complete() is pushed to the pureReducer, which
+// PureTransducerFunc.Transduce() attaches.
+type PureTransducerFunc func(Reducer) Reducer
+
+func (f PureTransducerFunc) Transduce(r ReduceStep) ReduceStep {
+	return pureReducer{reduce: f(r.Reduce), complete: r.Complete}
+}
+
+type pureReducer struct {
+	reduce   Reducer
+	complete func(accum interface{}) (result interface{})
+}
+
+func (r pureReducer) Reduce(accum interface{}, value interface{}) interface{} {
+	return r.reduce(accum, value)
+}
+
+func (r pureReducer) Complete(accum interface{}) interface{} {
+	// Pure functions can't have any completion work to do, so just pass along
+	// TODO ...uh, right? either way, this is just a convenience
+	return r.complete(accum)
 }
 
 type Mapper func(interface{}) interface{}
@@ -36,8 +67,6 @@ func fml(v ...interface{}) {
 // No guarantees about the relationship between the type of input and output;
 // output may be a collection of the input type, or may not.
 type Exploder func(interface{}) ValueStream
-
-type Reducer func(accum interface{}, value interface{}) (result interface{})
 
 func Sum(accum interface{}, val interface{}) (result interface{}) {
 	return accum.(int) + val.(int)
@@ -127,11 +156,14 @@ func Identity(accum interface{}, value interface{}) interface{} {
 
 func Seq(vs ValueStream, init []int, tlist ...Transducer) []int {
 	fml(tlist)
-	// Final reducing func - append to the list
-	t := Append(Identity)
+	// Final reducing func - append to slice
+	// TODO really awkward patching this together like this - refactor it out smartly
+	var t ReduceStep = pureReducer{reduce: Append(Identity), complete: func(accum interface{}) interface{} {
+		return accum
+	}}
 
-	// Walk backwards through transducer list to assemble in
-	// correct order
+	// Walk backwards through transducer list to assemble in correct order.
+	// Clojure folk refer to this as applying transducers to this job.
 	for i := len(tlist) - 1; i >= 0; i-- {
 		fml(tlist[i])
 		t = tlist[i].Transduce(t)
@@ -149,13 +181,13 @@ func Seq(vs ValueStream, init []int, tlist ...Transducer) []int {
 
 		fml("Main loop:", v)
 		// weird that we do nothing here
-		ret = t(ret, v.(int))
+		ret = t.Reduce(ret, v.(int))
 	}
 
 	return ret.([]int)
 }
 
-func Map(f Mapper) TransducerFunc {
+func Map(f Mapper) PureTransducerFunc {
 	return func(r Reducer) Reducer {
 		return func(accum interface{}, value interface{}) interface{} {
 			fml("MAP: accum is", accum, "value is", value)
@@ -164,7 +196,7 @@ func Map(f Mapper) TransducerFunc {
 	}
 }
 
-func Filter(f Filterer) TransducerFunc {
+func Filter(f Filterer) PureTransducerFunc {
 	return func(r Reducer) Reducer {
 		return func(accum interface{}, value interface{}) interface{} {
 			fml("FILTER: accum is", accum, "value is", value)
@@ -200,7 +232,7 @@ func Append(r Reducer) Reducer {
 // Mapcat first runs an exploder, then 'concats' results by
 // passing each individual value along to the next transducer
 // in the stack.
-func Mapcat(f Exploder) TransducerFunc {
+func Mapcat(f Exploder) PureTransducerFunc {
 	return func(r Reducer) Reducer {
 		return func(accum interface{}, value interface{}) interface{} {
 			fml("MAPCAT: Processing explode val:", value)
@@ -226,7 +258,7 @@ func Mapcat(f Exploder) TransducerFunc {
 
 // Dedupe is a particular type of filter, but its statefulness
 // means we need to treat it differently and can't reuse Filter
-func Dedupe() TransducerFunc {
+func Dedupe() PureTransducerFunc {
 	// Statefulness is encapsulated in the transducer function - when
 	// a materializing function calls the transducer, it produces a
 	// fresh state that lives only as long as that run.
@@ -251,39 +283,55 @@ func Dedupe() TransducerFunc {
 // chunks of []interface{} of the given length.
 //
 // Here's one place we sorely feel the lack of algebraic types.
-//
-// Stateful.
 func Chunk(length int) TransducerFunc {
 	if length < 1 {
 		panic("chunks must be at least one element in size")
 	}
 
-	return func(r Reducer) Reducer {
+	return func(r ReduceStep) ReduceStep {
 		// TODO look into most memory-savvy ways of doing this
-		coll := make(ValueSlice, length, length)
-		var count int
-		return func(accum interface{}, value interface{}) interface{} {
-			fml("CHUNK: Chunk count: ", count, "coll contents: ", coll)
-			coll[count] = value
-			count++
-
-			if count == length {
-				count = 0
-				newcoll := make(ValueSlice, length, length)
-				copy(newcoll, coll)
-				fml("CHUNK: passing val to next td:", coll)
-				return r(accum, newcoll.AsStream())
-			} else {
-				return accum
-			}
-		}
+		return &chunk{length: length, coll: make(ValueSlice, length, length), next: r}
 	}
+}
+
+// Chunk is stateful, so it's handled with a struct instead of a pure function
+type chunk struct {
+	length int
+	count  int
+	coll   ValueSlice
+	next   ReduceStep
+}
+
+func (t *chunk) Reduce(accum interface{}, value interface{}) interface{} {
+	fml("CHUNK: Chunk count: ", t.count, "coll contents: ", t.coll)
+	t.coll[t.count] = value
+	t.count++
+
+	if t.count == t.length {
+		t.count = 0
+		newcoll := make(ValueSlice, t.length, t.length)
+		copy(newcoll, t.coll)
+		fml("CHUNK: passing val to next td:", t.coll)
+		return t.next.Reduce(accum, newcoll.AsStream())
+	} else {
+		return accum
+	}
+}
+
+func (t *chunk) Complete(accum interface{}) interface{} {
+	// if there's a partially-completed chunk, send it through reduction as-is
+	if t.count != 0 {
+		// should be fine to send the original, we know we're done
+		accum = t.next.Reduce(accum, t.coll[:t.count])
+	}
+
+	return t.next.Complete(accum)
 }
 
 // Condense the traversed collection by partitioning it into chunks,
 // represented by ValueStreams. A new contiguous stream is created every time
 // the injected filter function returns true.
-func ChunkBy(f Filterer) TransducerFunc {
+func ChunkBy(f Filterer) PureTransducerFunc {
 	return func(r Reducer) Reducer {
 		var coll []interface{}
 		return func(accum interface{}, value interface{}) interface{} {
@@ -328,7 +376,7 @@ func ChunkBy(f Filterer) TransducerFunc {
 
 // Passes the received value along to the next transducer, with the
 // given probability.
-func RandomSample(ρ float64) TransducerFunc {
+func RandomSample(ρ float64) PureTransducerFunc {
 	if ρ < 0.0 || ρ > 1.0 {
 		panic("ρ must be in the range [0.0,1.0].")
 	}

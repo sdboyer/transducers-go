@@ -55,7 +55,7 @@ func (r pureReducer) Complete(accum interface{}) interface{} {
 type Mapper func(interface{}) interface{}
 type Filterer func(interface{}) bool
 
-const dbg = true
+const dbg = false
 
 func fml(v ...interface{}) {
 	if dbg {

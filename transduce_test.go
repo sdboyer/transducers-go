@@ -142,3 +142,9 @@ func TestTransduceSample(t *testing.T) {
 		t.Error("Random sampling with 0 ρ should filter out all results")
 	}
 }
+
+func TestTakeNth(t *testing.T) {
+	result := Seq(Range(21), make([]int, 0), TakeNth(7))
+
+	intSliceEquals([]int{6, 13, 20}, result, t)
+}

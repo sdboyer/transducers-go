@@ -414,3 +414,15 @@ func RandomSample(ρ float64) PureFuncTransducer {
 		return rand.Float64() < ρ
 	})
 }
+
+func TakeNth(n int) PureFuncTransducer {
+	var count int
+
+	return Filter(func(_ interface{}) bool {
+		count++
+		if count%n == 0 {
+			return true
+		}
+		return false
+	})
+}

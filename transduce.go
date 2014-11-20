@@ -1,6 +1,9 @@
 package transduce
 
-import "fmt"
+import (
+	"fmt"
+	"math/rand"
+)
 
 // This is an outer piece, so doesn't need a type - use em how you want
 // type Materializer func(Transducer, Iterator)
@@ -321,4 +324,16 @@ func ChunkBy(f Filterer) TransducerFunc {
 			return accum
 		}
 	}
+}
+
+// Passes the received value along to the next transducer, with the
+// given probability.
+func RandomSample(ρ float64) TransducerFunc {
+	if ρ < 0.0 || ρ > 1.0 {
+		panic("ρ must be in the range [0.0,1.0].")
+	}
+
+	return Filter(func(_ interface{}) bool {
+		return rand.Float64() < ρ
+	})
 }

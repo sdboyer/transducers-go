@@ -1,9 +1,6 @@
 package transduce
 
-import (
-	"fmt"
-	"testing"
-)
+import "testing"
 
 var ints = []int{1, 2, 3, 4, 5}
 var evens = []int{2, 4}
@@ -132,7 +129,6 @@ func TestTransduceChunkChunkByFlatten(t *testing.T) {
 	}
 	xform := []Transducer{Chunk(3), ChunkBy(chunker), Mapcat(Flatten)}
 	result := Seq(Range(6), make([]int, 0), xform...)
-	fmt.Println(result)
 
 	intSliceEquals(t_range(6), result, t)
 }

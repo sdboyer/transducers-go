@@ -319,10 +319,12 @@ func (t *chunk) Reduce(accum interface{}, value interface{}) interface{} {
 }
 
 func (t *chunk) Complete(accum interface{}) interface{} {
+	fml("CHUNK: Completing...")
 	// if there's a partially-completed chunk, send it through reduction as-is
 	if t.count != 0 {
+		fml("CHUNK: Leftover values found, passing coll to next td:", t.coll[:t.count])
 		// should be fine to send the original, we know we're done
-		accum = t.next.Reduce(accum, t.coll[:t.count])
+		accum = t.next.Reduce(accum, t.coll[:t.count].AsStream())
 	}
 
 	return t.next.Complete(accum)
@@ -331,47 +333,70 @@ func (t *chunk) Complete(accum interface{}) interface{} {
 // Condense the traversed collection by partitioning it into chunks,
 // represented by ValueStreams. A new contiguous stream is created every time
 // the injected filter function returns true.
-func ChunkBy(f Filterer) PureTransducerFunc {
-	return func(r Reducer) Reducer {
-		var coll []interface{}
-		return func(accum interface{}, value interface{}) interface{} {
-			fml("CHUNKBY: Chunk size: ", len(coll), "coll contents: ", coll)
-			var vals ValueSlice
-			if vs, ok := value.(ValueStream); ok {
-				fml("CHUNKBY: operating on ValueStream")
-				// TODO this SUUUUUCKS, we have to duplicate the stream
-				// the fact that the logic splits like this is indicative of a deeper problem
-				vs.Each(func(v interface{}) {
-					vals = append(vals, v)
-				})
+func ChunkBy(f Filterer) TransducerFunc {
+	if f == nil {
+		panic("cannot provide nil function pointer to ChunkBy")
+	}
 
-				fml("CHUNKBY: collected vals:", vals)
+	return func(r ReduceStep) ReduceStep {
+		// TODO look into most memory-savvy ways of doing this
+		return &chunkBy{chunker: f, coll: make(ValueSlice, 0), next: r}
+	}
+}
 
-				if !f(vals.AsStream()) {
-					fml("CHUNKBY: chunk unfinished; appending these vals to coll:", vals)
-					coll = append(coll, vals.AsStream())
-				} else {
-					fml("CHUNKBY: passing value streams to next td:", coll)
-					accum = r(accum, coll)
-					coll = nil
-					coll = append(coll, vals.AsStream())
-				}
-			} else {
-				fml("CHUNKBY: operating on non-ValueStream")
-				if !f(value) {
-					fml("CHUNKBY: chunk unfinished; appending this val to coll:", value)
-					coll = append(coll, value)
-				} else {
-					fml("CHUNKBY: passing coll to next td:", coll)
-					accum = r(accum, coll)
-					coll = nil // TODO erm...correct way to zero out a slice?
-					coll = append(coll, value)
-				}
-			}
+type chunkBy struct {
+	chunker Filterer
+	coll    ValueSlice
+	next    ReduceStep
+}
 
-			return accum
+func (t *chunkBy) Reduce(accum interface{}, value interface{}) interface{} {
+	fml("CHUNKBY: Chunk size: ", len(t.coll), "coll contents: ", t.coll)
+	if vs, ok := value.(ValueStream); ok {
+		var vals ValueSlice
+		fml("CHUNKBY: operating on ValueStream")
+		// TODO this SUUUUUCKS, we have to duplicate the stream
+		// TODO the fact that the logic splits like this is indicative of a deeper problem
+		vs.Each(func(v interface{}) {
+			vals = append(vals, v)
+		})
+
+		fml("CHUNKBY: collected vals:", vals)
+
+		if !t.chunker(vals.AsStream()) {
+			fml("CHUNKBY: chunk unfinished; appending these vals to coll:", vals)
+			t.coll = append(t.coll, vals.AsStream())
+		} else {
+			fml("CHUNKBY: passing value streams to next td:", t.coll)
+			accum = t.next.Reduce(accum, t.coll.AsStream())
+			t.coll = nil
+			t.coll = append(t.coll, vals.AsStream())
+		}
+	} else {
+		fml("CHUNKBY: operating on non-ValueStream")
+		if !t.chunker(value) {
+			fml("CHUNKBY: chunk unfinished; appending this val to coll:", value)
+			t.coll = append(t.coll, value)
+		} else {
+			fml("CHUNKBY: passing coll to next td:", t.coll)
+			accum = t.next.Reduce(accum, t.coll.AsStream())
+			t.coll = nil // TODO erm...correct way to zero out a slice?
+			t.coll = append(t.coll, value)
 		}
 	}
+
+	return accum
+}
+
+func (t *chunkBy) Complete(accum interface{}) interface{} {
+	fml("CHUNKBY: Completing...")
+	// if there's a partially-completed chunk, send it through reduction as-is
+	if len(t.coll) != 0 {
+		fml("CHUNKBY: Leftover values found, passing coll to next td:", t.coll)
+		accum = t.next.Reduce(accum, t.coll.AsStream())
+	}
+
+	return t.next.Complete(accum)
 }
 
 // Passes the received value along to the next transducer, with the

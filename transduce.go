@@ -55,7 +55,7 @@ func (r pureReducer) Complete(accum interface{}) interface{} {
 type Mapper func(interface{}) interface{}
 type Filterer func(interface{}) bool
 
-const dbg = false
+const dbg = true
 
 func fml(v ...interface{}) {
 	if dbg {
@@ -145,6 +145,8 @@ func MakeReduce(collection interface{}) ValueStream {
 	switch c := collection.(type) {
 	case []int:
 		return iteratorToValueStream(&IntSliceIterator{slice: c})
+	case []interface{}:
+		return ValueSlice(c).AsStream()
 	default:
 		panic("not supported...yet")
 	}
@@ -181,7 +183,7 @@ func Seq(vs ValueStream, init []int, tlist ...Transducer) []int {
 
 		fml("Main loop:", v)
 		// weird that we do nothing here
-		ret = t.Reduce(ret, v.(int))
+		ret = t.Reduce(ret, v)
 	}
 
 	ret = t.Complete(ret)
@@ -415,6 +417,7 @@ func RandomSample(ρ float64) PureFuncTransducer {
 	})
 }
 
+// TakeNth takes every nth element to pass through it, discarding the remainder.
 func TakeNth(n int) PureFuncTransducer {
 	var count int
 
@@ -425,4 +428,20 @@ func TakeNth(n int) PureFuncTransducer {
 		}
 		return false
 	})
+}
+
+// Keep calls an injected mapper, then discards any nil value returned from the mapper.
+//
+// ONLY nils are discarded; false is kept.
+func Keep(f Mapper) PureFuncTransducer {
+	return func(r Reducer) Reducer {
+		return func(accum interface{}, value interface{}) interface{} {
+			fml("KEEP: accum is", accum, "value is", value)
+			nv := f(value)
+			if nv != nil {
+				return r(accum, nv)
+			}
+			return accum
+		}
+	}
 }

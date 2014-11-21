@@ -148,3 +148,24 @@ func TestTakeNth(t *testing.T) {
 
 	intSliceEquals([]int{6, 13, 20}, result, t)
 }
+
+func TestKeep(t *testing.T) {
+	v := []interface{}{0, nil, 1, 2, nil, false}
+
+	// include this type converter to make the bool into an int, or seq will have
+	// a type panic at the end. Just to prove that Keep retains false vals.
+	mapf := func(val interface{}) interface{} {
+		if _, ok := val.(bool); ok {
+			return 15
+		}
+		return val
+	}
+
+	keepf := func(val interface{}) interface{} {
+		return val
+	}
+
+	result := Seq(MakeReduce(v), make([]int, 0), Keep(keepf), Map(mapf))
+
+	intSliceEquals([]int{0, 1, 2, 15}, result, t)
+}

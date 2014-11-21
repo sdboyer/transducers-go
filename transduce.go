@@ -171,17 +171,10 @@ func Seq(vs ValueStream, init []int, tlist ...Transducer) []int {
 		t = tlist[i].Transduce(t)
 	}
 
-	var v interface{}
-	var done bool
 	var ret interface{} = init
 
-	for {
-		v, done = vs()
-		if done {
-			break
-		}
-
-		fml("Main loop:", v)
+	for v, done := vs(); !done; v, done = vs() {
+		fml("SEQ: Main loop:", v)
 		// weird that we do nothing here
 		ret = t.Reduce(ret, v)
 	}

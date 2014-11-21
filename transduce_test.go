@@ -169,3 +169,21 @@ func TestKeep(t *testing.T) {
 
 	intSliceEquals([]int{0, 1, 2, 15}, result, t)
 }
+
+func TestReplace(t *testing.T) {
+	tostrings := map[interface{}]interface{}{
+		2:  "two",
+		6:  "six",
+		18: "eighteen",
+	}
+
+	toints := map[interface{}]interface{}{
+		"two":      55,
+		"six":      35,
+		"eighteen": 41,
+	}
+
+	result := Seq(Range(19), make([]int, 0), Replace(tostrings), Replace(toints))
+
+	intSliceEquals([]int{0, 1, 55, 3, 4, 5, 35, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 41}, result, t)
+}

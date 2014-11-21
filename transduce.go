@@ -434,7 +434,23 @@ func Keep(f Mapper) PureFuncTransducer {
 			if nv != nil {
 				return r(accum, nv)
 			}
+			fml("KEEP: discarding nil")
 			return accum
+		}
+	}
+}
+
+// Given a map of replacement value pairs, will replace any value moving through
+// that has a key in the map with the corresponding value.
+func Replace(pairs map[interface{}]interface{}) PureFuncTransducer {
+	return func(r Reducer) Reducer {
+		return func(accum interface{}, value interface{}) interface{} {
+			if v, exists := pairs[value]; exists {
+				fml("REPLACE: match found, replacing", value, "with", v)
+				return r(accum, v)
+			}
+			fml("REPLACE: no match, passing along", value)
+			return r(accum, value)
 		}
 	}
 }

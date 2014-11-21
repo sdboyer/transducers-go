@@ -178,9 +178,13 @@ func TestKeepIndexed(t *testing.T) {
 		return index * value.(int)
 	}
 
-	result := Seq(Range(7), make([]int, 0), KeepIndexed(keepf))
+	td := KeepIndexed(keepf)
 
+	result := Seq(Range(7), make([]int, 0), td)
 	intSliceEquals([]int{0, 4, 16, 36}, result, t)
+
+	result2 := Seq(Range(7), make([]int, 0), td)
+	intSliceEquals([]int{0, 4, 16, 36}, result2, t)
 }
 
 func TestReplace(t *testing.T) {

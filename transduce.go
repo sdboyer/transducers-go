@@ -363,6 +363,7 @@ func (t *chunkBy) Reduce(accum interface{}, value interface{}) interface{} {
 
 		fml("CHUNKBY: collected vals:", vals)
 
+		// TODO this is not chunkby...it should make a new group every time a new val comes back
 		if !t.chunker(vals.AsStream()) {
 			fml("CHUNKBY: chunk unfinished; appending these vals to coll:", vals)
 			t.coll = append(t.coll, vals.AsStream())
@@ -442,8 +443,8 @@ func Keep(f Mapper) PureFuncTransducer {
 // KeepIndexed calls the provided indexed mapper, then discards any nil value
 // return from the mapper.
 func KeepIndexed(f IndexedMapper) PureFuncTransducer {
-	var count int
 	return func(r Reducer) Reducer {
+		var count int
 		return func(accum interface{}, value interface{}) interface{} {
 			fml("KEEPINDEXED: accum is", accum, "value is", value, "count is", count)
 			nv := f(count, value)

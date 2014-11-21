@@ -52,7 +52,8 @@ func (r pureReducer) Complete(accum interface{}) interface{} {
 	return r.complete(accum)
 }
 
-type Mapper func(interface{}) interface{}
+type Mapper func(value interface{}) interface{}
+type IndexedMapper func(index int, value interface{}) interface{}
 type Filterer func(interface{}) bool
 
 const dbg = true
@@ -304,7 +305,7 @@ type chunk struct {
 func (t *chunk) Reduce(accum interface{}, value interface{}) interface{} {
 	fml("CHUNK: Chunk count: ", t.count, "coll contents: ", t.coll)
 	t.coll[t.count] = value
-	t.count++
+	t.count++ // TODO atomic
 
 	if t.count == t.length {
 		t.count = 0
@@ -415,7 +416,7 @@ func TakeNth(n int) PureFuncTransducer {
 	var count int
 
 	return Filter(func(_ interface{}) bool {
-		count++
+		count++ // TODO atomic
 		if count%n == 0 {
 			return true
 		}
@@ -423,9 +424,7 @@ func TakeNth(n int) PureFuncTransducer {
 	})
 }
 
-// Keep calls an injected mapper, then discards any nil value returned from the mapper.
-//
-// ONLY nils are discarded; false is kept.
+// Keep calls the provided mapper, then discards any nil value returned from the mapper.
 func Keep(f Mapper) PureFuncTransducer {
 	return func(r Reducer) Reducer {
 		return func(accum interface{}, value interface{}) interface{} {
@@ -435,6 +434,26 @@ func Keep(f Mapper) PureFuncTransducer {
 				return r(accum, nv)
 			}
 			fml("KEEP: discarding nil")
+			return accum
+		}
+	}
+}
+
+// KeepIndexed calls the provided indexed mapper, then discards any nil value
+// return from the mapper.
+func KeepIndexed(f IndexedMapper) PureFuncTransducer {
+	var count int
+	return func(r Reducer) Reducer {
+		return func(accum interface{}, value interface{}) interface{} {
+			fml("KEEPINDEXED: accum is", accum, "value is", value, "count is", count)
+			nv := f(count, value)
+			count++ // TODO atomic
+
+			if nv != nil {
+				return r(accum, nv)
+			}
+
+			fml("KEEPINDEXED: discarding nil")
 			return accum
 		}
 	}

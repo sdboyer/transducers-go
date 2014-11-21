@@ -170,6 +170,19 @@ func TestKeep(t *testing.T) {
 	intSliceEquals([]int{0, 1, 2, 15}, result, t)
 }
 
+func TestKeepIndexed(t *testing.T) {
+	keepf := func(index int, value interface{}) interface{} {
+		if !even(index) {
+			return nil
+		}
+		return index * value.(int)
+	}
+
+	result := Seq(Range(7), make([]int, 0), KeepIndexed(keepf))
+
+	intSliceEquals([]int{0, 4, 16, 36}, result, t)
+}
+
 func TestReplace(t *testing.T) {
 	tostrings := map[interface{}]interface{}{
 		2:  "two",

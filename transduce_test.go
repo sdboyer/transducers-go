@@ -19,15 +19,15 @@ func intSliceEquals(a []int, b []int, t *testing.T) {
 }
 
 func TestTransduceMF(t *testing.T) {
-	mf := Seq(MakeReduce(ints), make([]int, 0), Map(inc), Filter(even))
-	fm := Seq(MakeReduce(ints), make([]int, 0), Filter(even), Map(inc))
+	mf := Transduce(MakeReduce(ints), make([]int, 0), Map(inc), Filter(even))
+	fm := Transduce(MakeReduce(ints), make([]int, 0), Filter(even), Map(inc))
 
 	intSliceEquals([]int{2, 4, 6}, mf, t)
 	intSliceEquals([]int{3, 5}, fm, t)
 }
 
 func TestTransduceMapFilterMapcat(t *testing.T) {
-	result := Seq(MakeReduce(ints), make([]int, 0), Filter(even), Map(inc), Mapcat(Range))
+	result := Transduce(MakeReduce(ints), make([]int, 0), Filter(even), Map(inc), Mapcat(Range))
 
 	intSliceEquals([]int{0, 1, 2, 0, 1, 2, 3, 4}, result, t)
 }
@@ -35,17 +35,17 @@ func TestTransduceMapFilterMapcat(t *testing.T) {
 func TestTransduceMapFilterMapcatDedupe(t *testing.T) {
 	xform := []Transducer{Filter(even), Map(inc), Mapcat(Range), Dedupe()}
 
-	result := Seq(MakeReduce(ints), make([]int, 0), xform...)
+	result := Transduce(MakeReduce(ints), make([]int, 0), xform...)
 	intSliceEquals([]int{0, 1, 2, 3, 4}, result, t)
 
 	// Dedupe is stateful. Do it twice to demonstrate that's handled
-	result2 := Seq(MakeReduce(ints), make([]int, 0), xform...)
+	result2 := Transduce(MakeReduce(ints), make([]int, 0), xform...)
 	intSliceEquals([]int{0, 1, 2, 3, 4}, result2, t)
 }
 
 func TestTransduceChunkFlatten(t *testing.T) {
 	xform := []Transducer{Chunk(3), Mapcat(Flatten)}
-	result := Seq(Range(6), make([]int, 0), xform...)
+	result := Transduce(Range(6), make([]int, 0), xform...)
 	// TODO crappy test b/c the steps are logical inversions - need to improv on Seq for better test
 
 	intSliceEquals(([]int{0, 1, 2, 3, 4, 5}), result, t)
@@ -56,23 +56,23 @@ func TestTransduceChunkChunkByFlatten(t *testing.T) {
 		return sum(value.(ValueStream)) > 7
 	}
 	xform := []Transducer{Chunk(3), ChunkBy(chunker), Mapcat(Flatten)}
-	result := Seq(Range(19), make([]int, 0), xform...)
+	result := Transduce(Range(19), make([]int, 0), xform...)
 
 	intSliceEquals(t_range(19), result, t)
 }
 
 func TestTransduceSample(t *testing.T) {
-	result := Seq(Range(12), make([]int, 0), RandomSample(1))
+	result := Transduce(Range(12), make([]int, 0), RandomSample(1))
 	intSliceEquals(t_range(12), result, t)
 
-	result2 := Seq(Range(12), make([]int, 0), RandomSample(0))
+	result2 := Transduce(Range(12), make([]int, 0), RandomSample(0))
 	if len(result2) != 0 {
 		t.Error("Random sampling with 0 ρ should filter out all results")
 	}
 }
 
 func TestTakeNth(t *testing.T) {
-	result := Seq(Range(21), make([]int, 0), TakeNth(7))
+	result := Transduce(Range(21), make([]int, 0), TakeNth(7))
 
 	intSliceEquals([]int{6, 13, 20}, result, t)
 }
@@ -93,7 +93,7 @@ func TestKeep(t *testing.T) {
 		return val
 	}
 
-	result := Seq(MakeReduce(v), make([]int, 0), Keep(keepf), Map(mapf))
+	result := Transduce(MakeReduce(v), make([]int, 0), Keep(keepf), Map(mapf))
 
 	intSliceEquals([]int{0, 1, 2, 15}, result, t)
 }
@@ -108,10 +108,10 @@ func TestKeepIndexed(t *testing.T) {
 
 	td := KeepIndexed(keepf)
 
-	result := Seq(Range(7), make([]int, 0), td)
+	result := Transduce(Range(7), make([]int, 0), td)
 	intSliceEquals([]int{0, 4, 16, 36}, result, t)
 
-	result2 := Seq(Range(7), make([]int, 0), td)
+	result2 := Transduce(Range(7), make([]int, 0), td)
 	intSliceEquals([]int{0, 4, 16, 36}, result2, t)
 }
 
@@ -128,17 +128,17 @@ func TestReplace(t *testing.T) {
 		"eighteen": 41,
 	}
 
-	result := Seq(Range(19), make([]int, 0), Replace(tostrings), Replace(toints))
+	result := Transduce(Range(19), make([]int, 0), Replace(tostrings), Replace(toints))
 
 	intSliceEquals([]int{0, 1, 55, 3, 4, 5, 35, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 41}, result, t)
 }
 
 func TestMapChunkTakeFlatten(t *testing.T) {
 	td := []Transducer{Map(inc), Chunk(2), Take(2), Mapcat(Flatten)}
-	result := Seq(Range(6), make([]int, 0), td...)
+	result := Transduce(Range(6), make([]int, 0), td...)
 	intSliceEquals([]int{1, 2, 3, 4}, result, t)
 
-	result2 := Seq(Range(6), make([]int, 0), td...)
+	result2 := Transduce(Range(6), make([]int, 0), td...)
 	intSliceEquals([]int{1, 2, 3, 4}, result2, t)
 }
 
@@ -146,7 +146,7 @@ func TestTakeWhile(t *testing.T) {
 	filter := func(value interface{}) bool {
 		return value.(int) < 4
 	}
-	result := Seq(Range(6), make([]int, 0), TakeWhile(filter))
+	result := Transduce(Range(6), make([]int, 0), TakeWhile(filter))
 	intSliceEquals([]int{0, 1, 2, 3}, result, t)
 }
 
@@ -155,12 +155,12 @@ func TestDropDropDropWhileTake(t *testing.T) {
 		return value.(int) < 5
 	}
 	td := []Transducer{Drop(1), Drop(1), DropWhile(dw), Take(5)}
-	result := Seq(Range(50), make([]int, 0), td...)
+	result := Transduce(Range(50), make([]int, 0), td...)
 
 	intSliceEquals([]int{5, 6, 7, 8, 9}, result, t)
 }
 
 func TestRemove(t *testing.T) {
-	result := Seq(Range(8), make([]int, 0), Remove(even))
+	result := Transduce(Range(8), make([]int, 0), Remove(even))
 	intSliceEquals([]int{1, 3, 5, 7}, result, t)
 }

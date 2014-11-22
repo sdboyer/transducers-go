@@ -1,6 +1,6 @@
 package transduce
 
-func Seq(vs ValueStream, init []int, tlist ...Transducer) []int {
+func Transduce(vs ValueStream, init []int, tlist ...Transducer) []int {
 	fml(tlist)
 	// Final reducing func - append to slice
 	// TODO really awkward patching this together like this - refactor it out smartly

@@ -7,6 +7,7 @@ type Reducer func(accum interface{}, value interface{}) (result interface{}, ter
 
 type Transducer func(ReduceStep) ReduceStep
 
+// TODO add Init method
 type ReduceStep interface {
 	// The primary reducing step function, called during normal operation.
 	Reduce(accum interface{}, value interface{}) (result interface{}, terminate bool) // Reducer
@@ -16,13 +17,22 @@ type ReduceStep interface {
 	Complete(accum interface{}) (result interface{})
 }
 
+// Transducer predicate function; used by Map, and others. Takes a value,
+// transforms it, and returns the result.
 type Mapper func(value interface{}) interface{}
+
+// Trandsucer predicate function. Same as Map, but passes an index value
+// indicating the number of times the predicate has been called.
 type IndexedMapper func(index int, value interface{}) interface{}
+
+// Transducer predicate function; used by most filtering-ish transducers. Takes
+// a value and returns a bool, which the transducer uses to make a decision,
+// typically (though not necessarily) about whether or not that value gets to
+// proceed in the reduction chain.
 type Filterer func(interface{}) bool
 
-// Exploders transform a value of some type into a stream of values.
-// No guarantees about the relationship between the type of input and output;
-// output may be a collection of the input type, or may not.
+// Transducer predicate function. Exploders transform a value of some type into
+// a stream of values. Used by Mapcat.
 type Exploder func(interface{}) ValueStream
 
 func sum(vs ValueStream) (total int) {
@@ -393,7 +403,6 @@ func TakeNth(n int) Transducer {
 
 	return func(r ReduceStep) ReduceStep {
 		return takeNth{filter{reducerBase{r}, func(_ interface{}) bool {
-			// TODO check how stack trace looks when we don't reimplement Reduce
 			count++ // TODO atomic
 			return count%n == 0
 		}}}

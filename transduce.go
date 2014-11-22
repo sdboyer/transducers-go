@@ -136,7 +136,15 @@ type filter struct {
 
 func (r filter) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
 	fml("FILTER: accum is", accum, "value is", value)
-	if r.f(value) {
+	var check bool
+	if vs, ok := value.(ValueStream); ok {
+		value = (&vs).Dup()
+		check = r.f(vs)
+	} else {
+		check = r.f(value)
+	}
+
+	if check {
 		return r.next.Reduce(accum, value)
 	} else {
 		return accum, false

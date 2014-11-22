@@ -2,7 +2,7 @@ package transduce
 
 import "fmt"
 
-const dbg = false
+const dbg = true
 
 func fml(v ...interface{}) {
 	if dbg {

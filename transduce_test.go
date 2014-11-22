@@ -198,3 +198,20 @@ func TestFlattenValueStream(t *testing.T) {
 
 	intSliceEquals(t_range(9), flattened, t)
 }
+
+func TestStreamDup(t *testing.T) {
+	stream := Range(3)
+	dupd := (&stream).Dup()
+
+	var res1, res2 []int
+	stream.Each(func(value interface{}) {
+		res1 = append(res1, value.(int))
+	})
+
+	dupd.Each(func(value interface{}) {
+		res2 = append(res2, value.(int))
+	})
+
+	intSliceEquals([]int{0, 1, 2}, res1, t)
+	intSliceEquals([]int{0, 1, 2}, res2, t)
+}

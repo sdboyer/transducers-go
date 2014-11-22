@@ -18,6 +18,55 @@ func (vs ValueStream) Each(f func(interface{})) {
 	}
 }
 
+// Duplicates a ValueStream by moving the pointer to the original stream
+// to an internal var, passing calls from either dup'd stream to the
+// origin stream, and holding values provided from origin until both dup'd
+// streams have consumed the value.
+//
+// Clean up after yourself with this one - it could be leaky. Also, very much
+// not threadsafe.
+//
+// TODO figure out if there's a nifty way to make this threadsafe
+func (vs *ValueStream) Dup() ValueStream {
+	var src ValueStream = *vs
+	var f1i, f2i int
+	var held []interface{}
+
+	*vs = func() (value interface{}, done bool) {
+		if f1i >= f2i {
+			// this stream is ahead, pull from the source
+			value, done = src()
+			if !done {
+				held = append(held, value)
+			}
+		} else {
+			value, held = held[0], held[1:]
+		}
+
+		if !done {
+			f1i++
+		}
+		return
+	}
+
+	return func() (value interface{}, done bool) {
+		if f2i >= f1i {
+			// this stream is ahead, pull from the source
+			value, done = src()
+			if !done {
+				held = append(held, value)
+			}
+		} else {
+			value, held = held[0], held[1:]
+		}
+
+		if !done {
+			f2i++
+		}
+		return
+	}
+}
+
 // Takes a ValueStream that (presumably) produces other ValueStreams, and,
 // ostensibly for the caller, flattens them together into a single ValueStream
 // by walking depth-first through an arbitrarily deep set of ValueStreams until

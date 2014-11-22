@@ -164,3 +164,21 @@ func TestRemove(t *testing.T) {
 	result := Transduce(Range(8), make([]int, 0), Remove(even))
 	intSliceEquals([]int{1, 3, 5, 7}, result, t)
 }
+
+func TestFlattenValueStream(t *testing.T) {
+	stream := flattenValueStream(ValueSlice{
+		MakeReduce([]int{0, 1}),
+		ValueSlice{
+			MakeReduce([]int{2, 3}),
+			MakeReduce([]int{4, 5, 6}),
+		}.AsStream(),
+		MakeReduce([]int{7, 8}),
+	}.AsStream())
+
+	var flattened []int
+	stream.Each(func(v interface{}) {
+		flattened = append(flattened, v.(int))
+	})
+
+	intSliceEquals(t_range(9), flattened, t)
+}

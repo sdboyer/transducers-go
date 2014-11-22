@@ -31,21 +31,21 @@ func flattenValueStream(vs ValueStream) ValueStream {
 	fml("FVS: creating stream stack func")
 
 	f = func() (value interface{}, done bool) {
-		length := len(ss)
-		fml("FVS: stream stack now length", length)
-		if length == 0 {
+		size := len(ss)
+		fml("FVS: stream stack now size", size)
+		if size == 0 {
 			// no streams left, we're definitely done
 			return nil, true
 		}
 
 		// grab value from stream on top of stack
-		value, done = ss[length-1]()
+		value, done = ss[size-1]()
 		fml("FVS: value grabbed:", value, "done state", done)
 
 		if done {
 			// this stream is done; pop the stack and recurse
 			fml("FVS: finished stream, popping and recursing")
-			ss = ss[:length-1]
+			ss = ss[:size-1]
 			return f()
 		}
 

@@ -28,21 +28,11 @@ type ReduceStep interface {
 	Complete(accum interface{}) (result interface{})
 }
 
-// We also provide an easy way to express transducers as pure functions. Sig is
-// still just focused on the Reducer funcs, though, because the work of supporting
-// supporting Complete() is pushed to the pureReducer, which
-// PureFuncTransducer.Transduce() attaches.
-type PureFuncTransducer func(Reducer) Reducer
-
-func (f PureFuncTransducer) Transduce(r ReduceStep) ReduceStep {
-	return pureReducer{inner: f(r.Reduce), complete: r.Complete}
-}
-
 type Mapper func(value interface{}) interface{}
 type IndexedMapper func(index int, value interface{}) interface{}
 type Filterer func(interface{}) bool
 
-const dbg = true
+const dbg = false
 
 func fml(v ...interface{}) {
 	if dbg {
@@ -144,7 +134,7 @@ func Identity(accum interface{}, value interface{}) (interface{}, bool) {
 }
 
 type map_r struct {
-	pureReducer2
+	reducerBase
 	f Mapper
 }
 
@@ -155,12 +145,12 @@ func (r map_r) Reduce(accum interface{}, value interface{}) (interface{}, bool) 
 
 func Map(f Mapper) TransducerFunc {
 	return func(r ReduceStep) ReduceStep {
-		return map_r{pureReducer2{r}, f}
+		return map_r{reducerBase{r}, f}
 	}
 }
 
 type filter struct {
-	pureReducer2
+	reducerBase
 	f Filterer
 }
 
@@ -175,7 +165,7 @@ func (r filter) Reduce(accum interface{}, value interface{}) (interface{}, bool)
 
 func Filter(f Filterer) TransducerFunc {
 	return func(r ReduceStep) ReduceStep {
-		return filter{pureReducer2{r}, f}
+		return filter{reducerBase{r}, f}
 	}
 }
 
@@ -204,34 +194,12 @@ func (r append_bottom) Complete(accum interface{}) interface{} {
 	return accum
 }
 
-func AppendB() ReduceStep {
+func Append() ReduceStep {
 	return append_bottom{}
 }
 
-func Append(r Reducer) Reducer {
-	return func(accum interface{}, value interface{}) (interface{}, bool) {
-		fml("APPEND: Appending", value, "onto", accum)
-
-		ret, terminate := r(accum, value)
-		switch v := ret.(type) {
-		case []int:
-			return append(accum.([]int), v...), terminate
-		case int:
-			return append(accum.([]int), v), terminate
-		case ValueStream:
-			flattenValueStream(v).Each(func(value interface{}) {
-				fml("APPEND: *actually* appending ", value, "onto", accum)
-				accum = append(accum.([]int), value.(int))
-			})
-			return ret, terminate
-		default:
-			panic("not supported")
-		}
-	}
-}
-
 type mapcat struct {
-	pureReducer2
+	reducerBase
 	f Exploder
 }
 
@@ -263,12 +231,12 @@ func (r mapcat) Reduce(accum interface{}, value interface{}) (interface{}, bool)
 // in the stack.
 func Mapcat(f Exploder) TransducerFunc {
 	return func(r ReduceStep) ReduceStep {
-		return mapcat{pureReducer2{r}, f}
+		return mapcat{reducerBase{r}, f}
 	}
 }
 
 type dedupe struct {
-	pureReducer2
+	reducerBase
 	// TODO Slice is fine for prototype, but should replace with type-appropriate
 	// search tree later
 	seen ValueSlice
@@ -293,7 +261,7 @@ func (r *dedupe) Reduce(accum interface{}, value interface{}) (interface{}, bool
 // datastructures (maps, slices, channels)!
 func Dedupe() TransducerFunc {
 	return func(r ReduceStep) ReduceStep {
-		return &dedupe{pureReducer2{r}, make([]interface{}, 0)}
+		return &dedupe{reducerBase{r}, make([]interface{}, 0)}
 	}
 }
 
@@ -433,7 +401,7 @@ func RandomSample(ρ float64) TransducerFunc {
 	}
 
 	return func(r ReduceStep) ReduceStep {
-		return randomSample{filter{pureReducer2{r}, func(_ interface{}) bool {
+		return randomSample{filter{reducerBase{r}, func(_ interface{}) bool {
 			//panic("oh shit")
 			return rand.Float64() < ρ
 		}}}
@@ -449,7 +417,7 @@ func TakeNth(n int) TransducerFunc {
 	var count int
 
 	return func(r ReduceStep) ReduceStep {
-		return takeNth{filter{pureReducer2{r}, func(_ interface{}) bool {
+		return takeNth{filter{reducerBase{r}, func(_ interface{}) bool {
 			// TODO check how stack trace looks when we don't reimplement Reduce
 			count++ // TODO atomic
 			return count%n == 0
@@ -458,7 +426,7 @@ func TakeNth(n int) TransducerFunc {
 }
 
 type keep struct {
-	pureReducer2
+	reducerBase
 	f Mapper
 }
 
@@ -475,12 +443,12 @@ func (r keep) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
 // Keep calls the provided mapper, then discards any nil value returned from the mapper.
 func Keep(f Mapper) TransducerFunc {
 	return func(r ReduceStep) ReduceStep {
-		return keep{pureReducer2{r}, f}
+		return keep{reducerBase{r}, f}
 	}
 }
 
 type keepIndexed struct {
-	pureReducer2
+	reducerBase
 	count int
 	f     IndexedMapper
 }
@@ -503,12 +471,12 @@ func (r *keepIndexed) Reduce(accum interface{}, value interface{}) (interface{},
 // return from the mapper.
 func KeepIndexed(f IndexedMapper) TransducerFunc {
 	return func(r ReduceStep) ReduceStep {
-		return &keepIndexed{pureReducer2{r}, 0, f}
+		return &keepIndexed{reducerBase{r}, 0, f}
 	}
 }
 
 type replace struct {
-	pureReducer2
+	reducerBase
 	pairs map[interface{}]interface{}
 }
 
@@ -525,12 +493,12 @@ func (r replace) Reduce(accum interface{}, value interface{}) (interface{}, bool
 // that has a key in the map with the corresponding value.
 func Replace(pairs map[interface{}]interface{}) TransducerFunc {
 	return func(r ReduceStep) ReduceStep {
-		return replace{pureReducer2{r}, pairs}
+		return replace{reducerBase{r}, pairs}
 	}
 }
 
 type take struct {
-	pureReducer2
+	reducerBase
 	max   uint
 	count uint
 }
@@ -551,12 +519,12 @@ func (r *take) Reduce(accum interface{}, value interface{}) (interface{}, bool) 
 // terminate the transducing process.
 func Take(max uint) TransducerFunc {
 	return func(r ReduceStep) ReduceStep {
-		return &take{pureReducer2{r}, max, 0}
+		return &take{reducerBase{r}, max, 0}
 	}
 }
 
 type takeWhile struct {
-	pureReducer2
+	reducerBase
 	f Filterer
 }
 
@@ -572,12 +540,12 @@ func (r takeWhile) Reduce(accum interface{}, value interface{}) (interface{}, bo
 // TakeWhile accepts values until the injected filterer function returns false.
 func TakeWhile(f Filterer) TransducerFunc {
 	return func(r ReduceStep) ReduceStep {
-		return takeWhile{pureReducer2{r}, f}
+		return takeWhile{reducerBase{r}, f}
 	}
 }
 
 type drop struct {
-	pureReducer2
+	reducerBase
 	min   uint
 	count uint
 }
@@ -597,12 +565,12 @@ func (r *drop) Reduce(accum interface{}, value interface{}) (interface{}, bool) 
 // let everything through unchanged.
 func Drop(min uint) TransducerFunc {
 	return func(r ReduceStep) ReduceStep {
-		return &drop{pureReducer2{r}, min, 0}
+		return &drop{reducerBase{r}, min, 0}
 	}
 }
 
 type dropWhile struct {
-	pureReducer2
+	reducerBase
 	f        Filterer
 	accepted bool
 }
@@ -623,7 +591,7 @@ func (r *dropWhile) Reduce(accum interface{}, value interface{}) (interface{}, b
 // DropWhile drops values until the injected filterer function returns false.
 func DropWhile(f Filterer) TransducerFunc {
 	return func(r ReduceStep) ReduceStep {
-		return &dropWhile{pureReducer2{r}, f, false}
+		return &dropWhile{reducerBase{r}, f, false}
 	}
 }
 
@@ -636,7 +604,7 @@ type remove struct {
 // It is the inverse of Filter.
 func Remove(f Filterer) TransducerFunc {
 	return func(r ReduceStep) ReduceStep {
-		return remove{filter{pureReducer2{r}, func(value interface{}) bool {
+		return remove{filter{reducerBase{r}, func(value interface{}) bool {
 			return !f(value)
 		}}}
 	}

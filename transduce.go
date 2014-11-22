@@ -1,21 +1,13 @@
 package transduce
 
-import (
-	"fmt"
-	"math/rand"
-)
+import "math/rand"
 
 // The master signature: a reducing step function.
 type Reducer func(accum interface{}, value interface{}) (result interface{}, terminate bool)
 
-// Transducers are an interface, but...
-type Transducer interface {
-	Transduce(ReduceStep) ReduceStep
-}
+type Transducer func(ReduceStep) ReduceStep
 
-type TransducerFunc func(ReduceStep) ReduceStep
-
-func (f TransducerFunc) Transduce(r ReduceStep) ReduceStep {
+func (f Transducer) Transduce(r ReduceStep) ReduceStep {
 	return f(r)
 }
 
@@ -31,14 +23,6 @@ type ReduceStep interface {
 type Mapper func(value interface{}) interface{}
 type IndexedMapper func(index int, value interface{}) interface{}
 type Filterer func(interface{}) bool
-
-const dbg = false
-
-func fml(v ...interface{}) {
-	if dbg {
-		fmt.Println(v)
-	}
-}
 
 // Exploders transform a value of some type into a stream of values.
 // No guarantees about the relationship between the type of input and output;
@@ -143,7 +127,7 @@ func (r map_r) Reduce(accum interface{}, value interface{}) (interface{}, bool) 
 	return r.next.Reduce(accum, r.f(value))
 }
 
-func Map(f Mapper) TransducerFunc {
+func Map(f Mapper) Transducer {
 	return func(r ReduceStep) ReduceStep {
 		return map_r{reducerBase{r}, f}
 	}
@@ -163,7 +147,7 @@ func (r filter) Reduce(accum interface{}, value interface{}) (interface{}, bool)
 	}
 }
 
-func Filter(f Filterer) TransducerFunc {
+func Filter(f Filterer) Transducer {
 	return func(r ReduceStep) ReduceStep {
 		return filter{reducerBase{r}, f}
 	}
@@ -229,7 +213,7 @@ func (r mapcat) Reduce(accum interface{}, value interface{}) (interface{}, bool)
 // Mapcat first runs an exploder, then 'concats' results by
 // passing each individual value along to the next transducer
 // in the stack.
-func Mapcat(f Exploder) TransducerFunc {
+func Mapcat(f Exploder) Transducer {
 	return func(r ReduceStep) ReduceStep {
 		return mapcat{reducerBase{r}, f}
 	}
@@ -259,7 +243,7 @@ func (r *dedupe) Reduce(accum interface{}, value interface{}) (interface{}, bool
 //
 // Simple equality (==) is used for comparison - will blow up on non-hashable
 // datastructures (maps, slices, channels)!
-func Dedupe() TransducerFunc {
+func Dedupe() Transducer {
 	return func(r ReduceStep) ReduceStep {
 		return &dedupe{reducerBase{r}, make([]interface{}, 0)}
 	}
@@ -269,7 +253,7 @@ func Dedupe() TransducerFunc {
 // chunks of []interface{} of the given length.
 //
 // Here's one place we sorely feel the lack of algebraic types.
-func Chunk(length int) TransducerFunc {
+func Chunk(length int) Transducer {
 	if length < 1 {
 		panic("chunks must be at least one element in size")
 	}
@@ -321,7 +305,7 @@ func (t *chunk) Complete(accum interface{}) interface{} {
 // Condense the traversed collection by partitioning it into chunks,
 // represented by ValueStreams. A new contiguous stream is created every time
 // the injected filter function returns true.
-func ChunkBy(f Filterer) TransducerFunc {
+func ChunkBy(f Filterer) Transducer {
 	if f == nil {
 		panic("cannot provide nil function pointer to ChunkBy")
 	}
@@ -395,7 +379,7 @@ type randomSample struct {
 
 // Passes the received value along to the next transducer, with the
 // given probability.
-func RandomSample(ρ float64) TransducerFunc {
+func RandomSample(ρ float64) Transducer {
 	if ρ < 0.0 || ρ > 1.0 {
 		panic("ρ must be in the range [0.0,1.0].")
 	}
@@ -413,7 +397,7 @@ type takeNth struct {
 }
 
 // TakeNth takes every nth element to pass through it, discarding the remainder.
-func TakeNth(n int) TransducerFunc {
+func TakeNth(n int) Transducer {
 	var count int
 
 	return func(r ReduceStep) ReduceStep {
@@ -441,7 +425,7 @@ func (r keep) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
 }
 
 // Keep calls the provided mapper, then discards any nil value returned from the mapper.
-func Keep(f Mapper) TransducerFunc {
+func Keep(f Mapper) Transducer {
 	return func(r ReduceStep) ReduceStep {
 		return keep{reducerBase{r}, f}
 	}
@@ -469,7 +453,7 @@ func (r *keepIndexed) Reduce(accum interface{}, value interface{}) (interface{},
 
 // KeepIndexed calls the provided indexed mapper, then discards any nil value
 // return from the mapper.
-func KeepIndexed(f IndexedMapper) TransducerFunc {
+func KeepIndexed(f IndexedMapper) Transducer {
 	return func(r ReduceStep) ReduceStep {
 		return &keepIndexed{reducerBase{r}, 0, f}
 	}
@@ -491,7 +475,7 @@ func (r replace) Reduce(accum interface{}, value interface{}) (interface{}, bool
 
 // Given a map of replacement value pairs, will replace any value moving through
 // that has a key in the map with the corresponding value.
-func Replace(pairs map[interface{}]interface{}) TransducerFunc {
+func Replace(pairs map[interface{}]interface{}) Transducer {
 	return func(r ReduceStep) ReduceStep {
 		return replace{reducerBase{r}, pairs}
 	}
@@ -517,7 +501,7 @@ func (r *take) Reduce(accum interface{}, value interface{}) (interface{}, bool) 
 
 // Take specifies a maximum number of values to receive, after which it will
 // terminate the transducing process.
-func Take(max uint) TransducerFunc {
+func Take(max uint) Transducer {
 	return func(r ReduceStep) ReduceStep {
 		return &take{reducerBase{r}, max, 0}
 	}
@@ -538,7 +522,7 @@ func (r takeWhile) Reduce(accum interface{}, value interface{}) (interface{}, bo
 }
 
 // TakeWhile accepts values until the injected filterer function returns false.
-func TakeWhile(f Filterer) TransducerFunc {
+func TakeWhile(f Filterer) Transducer {
 	return func(r ReduceStep) ReduceStep {
 		return takeWhile{reducerBase{r}, f}
 	}
@@ -563,7 +547,7 @@ func (r *drop) Reduce(accum interface{}, value interface{}) (interface{}, bool) 
 
 // Drop specifies a number of values to initially ignore, after which it will
 // let everything through unchanged.
-func Drop(min uint) TransducerFunc {
+func Drop(min uint) Transducer {
 	return func(r ReduceStep) ReduceStep {
 		return &drop{reducerBase{r}, min, 0}
 	}
@@ -589,7 +573,7 @@ func (r *dropWhile) Reduce(accum interface{}, value interface{}) (interface{}, b
 }
 
 // DropWhile drops values until the injected filterer function returns false.
-func DropWhile(f Filterer) TransducerFunc {
+func DropWhile(f Filterer) Transducer {
 	return func(r ReduceStep) ReduceStep {
 		return &dropWhile{reducerBase{r}, f, false}
 	}
@@ -602,7 +586,7 @@ type remove struct {
 // Remove drops items when the injected filterer function returns true.
 //
 // It is the inverse of Filter.
-func Remove(f Filterer) TransducerFunc {
+func Remove(f Filterer) Transducer {
 	return func(r ReduceStep) ReduceStep {
 		return remove{filter{reducerBase{r}, func(value interface{}) bool {
 			return !f(value)

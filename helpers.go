@@ -1,5 +1,15 @@
 package transduce
 
+import "fmt"
+
+const dbg = false
+
+func fml(v ...interface{}) {
+	if dbg {
+		fmt.Println(v)
+	}
+}
+
 type reducerBase struct {
 	next ReduceStep
 }

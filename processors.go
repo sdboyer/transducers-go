@@ -7,7 +7,7 @@ func Transduce(vs ValueStream, init []int, tlist ...Transducer) []int {
 	// Walk backwards through transducer list to assemble in correct order.
 	// Clojure folk refer to this as applying transducers to this job.
 	for i := len(tlist) - 1; i >= 0; i-- {
-		t = tlist[i].Transduce(t)
+		t = tlist[i](t)
 	}
 
 	var ret interface{} = init

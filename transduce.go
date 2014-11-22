@@ -6,7 +6,7 @@ import (
 )
 
 // The master signature: a reducing step function.
-type Reducer func(accum interface{}, value interface{}) (result interface{})
+type Reducer func(accum interface{}, value interface{}) (result interface{}, terminate bool)
 
 // Transducers are an interface, but...
 type Transducer interface {
@@ -21,7 +21,7 @@ func (f TransducerFunc) Transduce(r ReduceStep) ReduceStep {
 
 type ReduceStep interface {
 	// The primary reducing step function, called during normal operation.
-	Reduce(accum interface{}, value interface{}) (result interface{})
+	Reduce(accum interface{}, value interface{}) (result interface{}, terminate bool) // Reducer
 	// Complete is called when the input has been exhausted; stateful transducers
 	// should flush any held state (e.g. values awaiting a full chunk) through here.
 	Complete(accum interface{}) (result interface{})
@@ -34,16 +34,16 @@ type ReduceStep interface {
 type PureFuncTransducer func(Reducer) Reducer
 
 func (f PureFuncTransducer) Transduce(r ReduceStep) ReduceStep {
-	return pureReducer{reduce: f(r.Reduce), complete: r.Complete}
+	return pureReducer{inner: f(r.Reduce), complete: r.Complete}
 }
 
 type pureReducer struct {
-	reduce   Reducer
+	inner    Reducer
 	complete func(accum interface{}) (result interface{})
 }
 
-func (r pureReducer) Reduce(accum interface{}, value interface{}) interface{} {
-	return r.reduce(accum, value)
+func (r pureReducer) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+	return r.inner(accum, value)
 }
 
 func (r pureReducer) Complete(accum interface{}) interface{} {
@@ -153,15 +153,15 @@ func MakeReduce(collection interface{}) ValueStream {
 	}
 }
 
-func Identity(accum interface{}, value interface{}) interface{} {
-	return value
+func Identity(accum interface{}, value interface{}) (interface{}, bool) {
+	return value, false
 }
 
 func Seq(vs ValueStream, init []int, tlist ...Transducer) []int {
 	fml(tlist)
 	// Final reducing func - append to slice
 	// TODO really awkward patching this together like this - refactor it out smartly
-	var t ReduceStep = pureReducer{reduce: Append(Identity), complete: func(accum interface{}) interface{} {
+	var t ReduceStep = pureReducer{inner: Append(Identity), complete: func(accum interface{}) interface{} {
 		return accum
 	}}
 
@@ -173,11 +173,14 @@ func Seq(vs ValueStream, init []int, tlist ...Transducer) []int {
 	}
 
 	var ret interface{} = init
+	var terminate bool
 
 	for v, done := vs(); !done; v, done = vs() {
 		fml("SEQ: Main loop:", v)
-		// weird that we do nothing here
-		ret = t.Reduce(ret, v)
+		ret, terminate = t.Reduce(ret, v)
+		if terminate {
+			break
+		}
 	}
 
 	ret = t.Complete(ret)
@@ -187,7 +190,7 @@ func Seq(vs ValueStream, init []int, tlist ...Transducer) []int {
 
 func Map(f Mapper) PureFuncTransducer {
 	return func(r Reducer) Reducer {
-		return func(accum interface{}, value interface{}) interface{} {
+		return func(accum interface{}, value interface{}) (interface{}, bool) {
 			fml("MAP: accum is", accum, "value is", value)
 			return r(accum, f(value).(int))
 		}
@@ -196,31 +199,33 @@ func Map(f Mapper) PureFuncTransducer {
 
 func Filter(f Filterer) PureFuncTransducer {
 	return func(r Reducer) Reducer {
-		return func(accum interface{}, value interface{}) interface{} {
+		return func(accum interface{}, value interface{}) (interface{}, bool) {
 			fml("FILTER: accum is", accum, "value is", value)
 			if f(value) {
 				return r(accum, value)
 			} else {
-				return accum
+				return accum, false
 			}
 		}
 	}
 }
 
 func Append(r Reducer) Reducer {
-	return func(accum interface{}, value interface{}) interface{} {
+	return func(accum interface{}, value interface{}) (interface{}, bool) {
 		fml("APPEND: Appending", value, "onto", accum)
-		switch v := r(accum, value).(type) {
+
+		ret, terminate := r(accum, value)
+		switch v := ret.(type) {
 		case []int:
-			return append(accum.([]int), v...)
+			return append(accum.([]int), v...), terminate
 		case int:
-			return append(accum.([]int), v)
+			return append(accum.([]int), v), terminate
 		case ValueStream:
 			flattenValueStream(v).Each(func(value interface{}) {
 				fml("APPEND: *actually* appending ", value, "onto", accum)
 				accum = append(accum.([]int), value.(int))
 			})
-			return accum
+			return ret, terminate
 		default:
 			panic("not supported")
 		}
@@ -232,12 +237,12 @@ func Append(r Reducer) Reducer {
 // in the stack.
 func Mapcat(f Exploder) PureFuncTransducer {
 	return func(r Reducer) Reducer {
-		return func(accum interface{}, value interface{}) interface{} {
+		return func(accum interface{}, value interface{}) (interface{}, bool) {
 			fml("MAPCAT: Processing explode val:", value)
 			stream := f(value)
 
 			var v interface{}
-			var done bool
+			var done, terminate bool
 
 			for { // <-- the *loop* is the 'cat'
 				v, done = stream()
@@ -246,10 +251,13 @@ func Mapcat(f Exploder) PureFuncTransducer {
 				}
 				fml("MAPCAT: Calling next t on val:", v, "accum is:", accum)
 
-				accum = r(accum, v)
+				accum, terminate = r(accum, v)
+				if terminate {
+					break
+				}
 			}
 
-			return accum
+			return accum, terminate
 		}
 	}
 }
@@ -266,10 +274,10 @@ func Dedupe() PureFuncTransducer {
 		// TODO Slice is fine for prototype, but should replace with
 		// type-appropriate search tree later
 		seen := make([]interface{}, 0)
-		return func(accum interface{}, value interface{}) interface{} {
+		return func(accum interface{}, value interface{}) (interface{}, bool) {
 			for _, v := range seen {
 				if value == v {
-					return accum
+					return accum, false
 				}
 			}
 
@@ -296,13 +304,14 @@ func Chunk(length int) TransducerFunc {
 
 // Chunk is stateful, so it's handled with a struct instead of a pure function
 type chunk struct {
-	length int
-	count  int
-	coll   ValueSlice
-	next   ReduceStep
+	length    int
+	count     int
+	terminate bool
+	coll      ValueSlice
+	next      ReduceStep
 }
 
-func (t *chunk) Reduce(accum interface{}, value interface{}) interface{} {
+func (t *chunk) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
 	fml("CHUNK: Chunk count: ", t.count, "coll contents: ", t.coll)
 	t.coll[t.count] = value
 	t.count++ // TODO atomic
@@ -312,19 +321,20 @@ func (t *chunk) Reduce(accum interface{}, value interface{}) interface{} {
 		newcoll := make(ValueSlice, t.length, t.length)
 		copy(newcoll, t.coll)
 		fml("CHUNK: passing val to next td:", t.coll)
-		return t.next.Reduce(accum, newcoll.AsStream())
+		accum, t.terminate = t.next.Reduce(accum, newcoll.AsStream())
+		return accum, t.terminate
 	} else {
-		return accum
+		return accum, false
 	}
 }
 
 func (t *chunk) Complete(accum interface{}) interface{} {
 	fml("CHUNK: Completing...")
 	// if there's a partially-completed chunk, send it through reduction as-is
-	if t.count != 0 {
+	if t.count != 0 && !t.terminate {
 		fml("CHUNK: Leftover values found, passing coll to next td:", t.coll[:t.count])
 		// should be fine to send the original, we know we're done
-		accum = t.next.Reduce(accum, t.coll[:t.count].AsStream())
+		accum, t.terminate = t.next.Reduce(accum, t.coll[:t.count].AsStream())
 	}
 
 	return t.next.Complete(accum)
@@ -345,12 +355,13 @@ func ChunkBy(f Filterer) TransducerFunc {
 }
 
 type chunkBy struct {
-	chunker Filterer
-	coll    ValueSlice
-	next    ReduceStep
+	chunker   Filterer
+	coll      ValueSlice
+	next      ReduceStep
+	terminate bool
 }
 
-func (t *chunkBy) Reduce(accum interface{}, value interface{}) interface{} {
+func (t *chunkBy) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
 	fml("CHUNKBY: Chunk size: ", len(t.coll), "coll contents: ", t.coll)
 	if vs, ok := value.(ValueStream); ok {
 		var vals ValueSlice
@@ -369,7 +380,7 @@ func (t *chunkBy) Reduce(accum interface{}, value interface{}) interface{} {
 			t.coll = append(t.coll, vals.AsStream())
 		} else {
 			fml("CHUNKBY: passing value streams to next td:", t.coll)
-			accum = t.next.Reduce(accum, t.coll.AsStream())
+			accum, t.terminate = t.next.Reduce(accum, t.coll.AsStream())
 			t.coll = nil
 			t.coll = append(t.coll, vals.AsStream())
 		}
@@ -380,21 +391,21 @@ func (t *chunkBy) Reduce(accum interface{}, value interface{}) interface{} {
 			t.coll = append(t.coll, value)
 		} else {
 			fml("CHUNKBY: passing coll to next td:", t.coll)
-			accum = t.next.Reduce(accum, t.coll.AsStream())
+			accum, t.terminate = t.next.Reduce(accum, t.coll.AsStream())
 			t.coll = nil // TODO erm...correct way to zero out a slice?
 			t.coll = append(t.coll, value)
 		}
 	}
 
-	return accum
+	return accum, t.terminate
 }
 
 func (t *chunkBy) Complete(accum interface{}) interface{} {
 	fml("CHUNKBY: Completing...")
 	// if there's a partially-completed chunk, send it through reduction as-is
-	if len(t.coll) != 0 {
+	if len(t.coll) != 0 && !t.terminate {
 		fml("CHUNKBY: Leftover values found, passing coll to next td:", t.coll)
-		accum = t.next.Reduce(accum, t.coll.AsStream())
+		accum, t.terminate = t.next.Reduce(accum, t.coll.AsStream())
 	}
 
 	return t.next.Complete(accum)
@@ -428,14 +439,14 @@ func TakeNth(n int) PureFuncTransducer {
 // Keep calls the provided mapper, then discards any nil value returned from the mapper.
 func Keep(f Mapper) PureFuncTransducer {
 	return func(r Reducer) Reducer {
-		return func(accum interface{}, value interface{}) interface{} {
+		return func(accum interface{}, value interface{}) (interface{}, bool) {
 			fml("KEEP: accum is", accum, "value is", value)
 			nv := f(value)
 			if nv != nil {
 				return r(accum, nv)
 			}
 			fml("KEEP: discarding nil")
-			return accum
+			return accum, false
 		}
 	}
 }
@@ -445,7 +456,7 @@ func Keep(f Mapper) PureFuncTransducer {
 func KeepIndexed(f IndexedMapper) PureFuncTransducer {
 	return func(r Reducer) Reducer {
 		var count int
-		return func(accum interface{}, value interface{}) interface{} {
+		return func(accum interface{}, value interface{}) (interface{}, bool) {
 			fml("KEEPINDEXED: accum is", accum, "value is", value, "count is", count)
 			nv := f(count, value)
 			count++ // TODO atomic
@@ -455,7 +466,7 @@ func KeepIndexed(f IndexedMapper) PureFuncTransducer {
 			}
 
 			fml("KEEPINDEXED: discarding nil")
-			return accum
+			return accum, false
 		}
 	}
 }
@@ -464,13 +475,32 @@ func KeepIndexed(f IndexedMapper) PureFuncTransducer {
 // that has a key in the map with the corresponding value.
 func Replace(pairs map[interface{}]interface{}) PureFuncTransducer {
 	return func(r Reducer) Reducer {
-		return func(accum interface{}, value interface{}) interface{} {
+		return func(accum interface{}, value interface{}) (interface{}, bool) {
 			if v, exists := pairs[value]; exists {
 				fml("REPLACE: match found, replacing", value, "with", v)
 				return r(accum, v)
 			}
 			fml("REPLACE: no match, passing along", value)
 			return r(accum, value)
+		}
+	}
+}
+
+// Take specifies a maximum number of values to receive, after which it will
+// terminate the transducing process.
+func Take(max uint) PureFuncTransducer {
+	return func(r Reducer) Reducer {
+		var count uint
+		return func(accum interface{}, value interface{}) (interface{}, bool) {
+			count++ // TODO atomic
+			fml("TAKE: processing item", count, "of", max, "; accum is", accum, "value is", value)
+			if count < max {
+				return r(accum, value)
+			}
+			// should NEVER be called again after this. add a panic branch?
+			accum, _ = r(accum, value)
+			fml("TAKE: reached final item, returning terminator")
+			return accum, true
 		}
 	}
 }

@@ -132,3 +132,12 @@ func TestReplace(t *testing.T) {
 
 	intSliceEquals([]int{0, 1, 55, 3, 4, 5, 35, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 41}, result, t)
 }
+
+func TestMapChunkTakeFlatten(t *testing.T) {
+	td := []Transducer{Map(inc), Chunk(2), Take(2), Mapcat(Flatten)}
+	result := Seq(Range(6), make([]int, 0), td...)
+	intSliceEquals([]int{1, 2, 3, 4}, result, t)
+
+	result2 := Seq(Range(6), make([]int, 0), td...)
+	intSliceEquals([]int{1, 2, 3, 4}, result2, t)
+}

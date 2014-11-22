@@ -118,7 +118,7 @@ type Streamable interface {
 }
 
 // Bind a function to the given collection that will allow traversal for reducing
-func MakeReduce(collection interface{}) ValueStream {
+func ToStream(collection interface{}) ValueStream {
 	// If the structure already provides a reducing method, just return that.
 	if c, ok := collection.(Streamable); ok {
 		return c.AsStream()

@@ -19,15 +19,15 @@ func intSliceEquals(a []int, b []int, t *testing.T) {
 }
 
 func TestTransduceMF(t *testing.T) {
-	mf := Transduce(MakeReduce(ints), make([]int, 0), Map(inc), Filter(even))
-	fm := Transduce(MakeReduce(ints), make([]int, 0), Filter(even), Map(inc))
+	mf := Transduce(ToStream(ints), make([]int, 0), Map(inc), Filter(even))
+	fm := Transduce(ToStream(ints), make([]int, 0), Filter(even), Map(inc))
 
 	intSliceEquals([]int{2, 4, 6}, mf, t)
 	intSliceEquals([]int{3, 5}, fm, t)
 }
 
 func TestTransduceMapFilterMapcat(t *testing.T) {
-	result := Transduce(MakeReduce(ints), make([]int, 0), Filter(even), Map(inc), Mapcat(Range))
+	result := Transduce(ToStream(ints), make([]int, 0), Filter(even), Map(inc), Mapcat(Range))
 
 	intSliceEquals([]int{0, 1, 2, 0, 1, 2, 3, 4}, result, t)
 }
@@ -35,11 +35,11 @@ func TestTransduceMapFilterMapcat(t *testing.T) {
 func TestTransduceMapFilterMapcatDedupe(t *testing.T) {
 	xform := []Transducer{Filter(even), Map(inc), Mapcat(Range), Dedupe()}
 
-	result := Transduce(MakeReduce(ints), make([]int, 0), xform...)
+	result := Transduce(ToStream(ints), make([]int, 0), xform...)
 	intSliceEquals([]int{0, 1, 2, 3, 4}, result, t)
 
 	// Dedupe is stateful. Do it twice to demonstrate that's handled
-	result2 := Transduce(MakeReduce(ints), make([]int, 0), xform...)
+	result2 := Transduce(ToStream(ints), make([]int, 0), xform...)
 	intSliceEquals([]int{0, 1, 2, 3, 4}, result2, t)
 }
 
@@ -109,7 +109,7 @@ func TestKeep(t *testing.T) {
 		return val
 	}
 
-	result := Transduce(MakeReduce(v), make([]int, 0), Keep(keepf), Map(mapf))
+	result := Transduce(ToStream(v), make([]int, 0), Keep(keepf), Map(mapf))
 
 	intSliceEquals([]int{0, 1, 2, 15}, result, t)
 }
@@ -183,12 +183,12 @@ func TestRemove(t *testing.T) {
 
 func TestFlattenValueStream(t *testing.T) {
 	stream := flattenValueStream(ValueSlice{
-		MakeReduce([]int{0, 1}),
+		ToStream([]int{0, 1}),
 		ValueSlice{
-			MakeReduce([]int{2, 3}),
-			MakeReduce([]int{4, 5, 6}),
+			ToStream([]int{2, 3}),
+			ToStream([]int{4, 5, 6}),
 		}.AsStream(),
-		MakeReduce([]int{7, 8}),
+		ToStream([]int{7, 8}),
 	}.AsStream())
 
 	var flattened []int

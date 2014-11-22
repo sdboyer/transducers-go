@@ -5,6 +5,7 @@ import "math/rand"
 // The master signature: a reducing step function.
 type Reducer func(accum interface{}, value interface{}) (result interface{}, terminate bool)
 
+// A transducer transforms a reducing function into a new reducing function.
 type Transducer func(ReduceStep) ReduceStep
 
 // TODO add Init method

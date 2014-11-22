@@ -62,7 +62,7 @@ func Flatten(value interface{}) ValueStream {
 		// TODO maybe detect ValueStreams here, too, but probably better to just be consistent
 		return ValueSlice(v).AsStream()
 	case []int:
-		return MakeReduce(v)
+		return ToStream(v)
 	case int, interface{}:
 		var done bool
 		// create single-eleement value stream
@@ -82,5 +82,5 @@ func Flatten(value interface{}) ValueStream {
 // Wraps t_range into a ValueStream
 func Range(limit interface{}) ValueStream {
 	// lazy and inefficient to use MakeReduce here, do it directly
-	return MakeReduce(t_range(limit.(int)))
+	return ToStream(t_range(limit.(int)))
 }

@@ -149,3 +149,13 @@ func TestTakeWhile(t *testing.T) {
 	result := Seq(Range(6), make([]int, 0), TakeWhile(filter))
 	intSliceEquals([]int{0, 1, 2, 3}, result, t)
 }
+
+func TestDropDropDropWhileTake(t *testing.T) {
+	dw := func(value interface{}) bool {
+		return value.(int) < 5
+	}
+	td := []Transducer{Drop(1), Drop(1), DropWhile(dw), Take(5)}
+	result := Seq(Range(50), make([]int, 0), td...)
+
+	intSliceEquals([]int{5, 6, 7, 8, 9}, result, t)
+}

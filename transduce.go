@@ -518,3 +518,40 @@ func TakeWhile(f Filterer) PureFuncTransducer {
 		}
 	}
 }
+
+// Drop specifies a number of values to initially ignore, after which it will
+// let everything through unchanged.
+func Drop(min uint) PureFuncTransducer {
+	return func(r Reducer) Reducer {
+		var count uint
+		return func(accum interface{}, value interface{}) (interface{}, bool) {
+			fml("DROP: processing item", count+1, ", min is", min, "; accum is", accum, "value is", value)
+			if count < min {
+				// Increment inside so no mutation after threshold is met
+				count++ // TODO atomic
+				return accum, false
+			}
+			// should NEVER be called again after this. add a panic branch?
+			return r(accum, value)
+		}
+	}
+}
+
+// DropWhile drops values until the injected filterer function returns false.
+func DropWhile(f Filterer) PureFuncTransducer {
+	return func(r Reducer) Reducer {
+		var accept bool
+		return func(accum interface{}, value interface{}) (interface{}, bool) {
+			fml("DROPWHILE: accum is", accum, "value is", value)
+			if !accept {
+				if !f(value) {
+					fml("DROPWHILE: filtering func returned false, accepting from now on")
+					accept = true
+				} else {
+					return accum, false
+				}
+			}
+			return r(accum, value)
+		}
+	}
+}

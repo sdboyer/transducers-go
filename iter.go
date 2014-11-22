@@ -117,6 +117,23 @@ type Streamable interface {
 	AsStream() ValueStream
 }
 
+// Bind a function to the given collection that will allow traversal for reducing
+func MakeReduce(collection interface{}) ValueStream {
+	// If the structure already provides a reducing method, just return that.
+	if c, ok := collection.(Streamable); ok {
+		return c.AsStream()
+	}
+
+	switch c := collection.(type) {
+	case []int:
+		return iteratorToValueStream(&IntSliceIterator{slice: c})
+	case []interface{}:
+		return ValueSlice(c).AsStream()
+	default:
+		panic("not supported...yet")
+	}
+}
+
 // Wrap an iterator up into a ValueStream func.
 func iteratorToValueStream(i Iterator) func() (value interface{}, done bool) {
 	return func() (interface{}, bool) {

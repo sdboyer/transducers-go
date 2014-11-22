@@ -141,3 +141,11 @@ func TestMapChunkTakeFlatten(t *testing.T) {
 	result2 := Seq(Range(6), make([]int, 0), td...)
 	intSliceEquals([]int{1, 2, 3, 4}, result2, t)
 }
+
+func TestTakeWhile(t *testing.T) {
+	filter := func(value interface{}) bool {
+		return value.(int) < 4
+	}
+	result := Seq(Range(6), make([]int, 0), TakeWhile(filter))
+	intSliceEquals([]int{0, 1, 2, 3}, result, t)
+}

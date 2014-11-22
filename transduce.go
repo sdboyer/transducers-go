@@ -504,3 +504,17 @@ func Take(max uint) PureFuncTransducer {
 		}
 	}
 }
+
+// TakeWhile accepts values until the injected filterer function returns false.
+func TakeWhile(f Filterer) PureFuncTransducer {
+	return func(r Reducer) Reducer {
+		return func(accum interface{}, value interface{}) (interface{}, bool) {
+			fml("TAKEWHILE: accum is", accum, "value is", value)
+			if !f(value) {
+				fml("TAKEWHILE: filtering func returned false, terminating")
+				return accum, true
+			}
+			return r(accum, value)
+		}
+	}
+}

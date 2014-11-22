@@ -7,10 +7,6 @@ type Reducer func(accum interface{}, value interface{}) (result interface{}, ter
 
 type Transducer func(ReduceStep) ReduceStep
 
-func (f Transducer) Transduce(r ReduceStep) ReduceStep {
-	return f(r)
-}
-
 type ReduceStep interface {
 	// The primary reducing step function, called during normal operation.
 	Reduce(accum interface{}, value interface{}) (result interface{}, terminate bool) // Reducer
@@ -29,10 +25,6 @@ type Filterer func(interface{}) bool
 // output may be a collection of the input type, or may not.
 type Exploder func(interface{}) ValueStream
 
-func Sum(accum interface{}, val interface{}) (result interface{}) {
-	return accum.(int) + val.(int)
-}
-
 func sum(vs ValueStream) (total int) {
 	vs.Each(func(value interface{}) {
 		fml("SUM: total", total)
@@ -41,6 +33,10 @@ func sum(vs ValueStream) (total int) {
 	fml("SUM: final total", total)
 
 	return
+}
+
+func Sum(value interface{}) interface{} {
+	return sum(value.(ValueStream))
 }
 
 // Basic Mapper function (increments by 1)
@@ -304,61 +300,42 @@ func (t *chunk) Complete(accum interface{}) interface{} {
 
 // Condense the traversed collection by partitioning it into chunks,
 // represented by ValueStreams. A new contiguous stream is created every time
-// the injected filter function returns true.
-func ChunkBy(f Filterer) Transducer {
-	if f == nil {
-		panic("cannot provide nil function pointer to ChunkBy")
-	}
-
+// the injected filter function returns a different value from the previous.
+func ChunkBy(f Mapper) Transducer {
 	return func(r ReduceStep) ReduceStep {
 		// TODO look into most memory-savvy ways of doing this
-		return &chunkBy{chunker: f, coll: make(ValueSlice, 0), next: r}
+		return &chunkBy{chunker: f, coll: make(ValueSlice, 0), next: r, first: true, last: nil}
 	}
 }
 
 type chunkBy struct {
-	chunker   Filterer
+	chunker   Mapper
+	first     bool
+	last      interface{}
 	coll      ValueSlice
 	next      ReduceStep
 	terminate bool
 }
 
 func (t *chunkBy) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
-	fml("CHUNKBY: Chunk size: ", len(t.coll), "coll contents: ", t.coll)
-	if vs, ok := value.(ValueStream); ok {
-		var vals ValueSlice
-		fml("CHUNKBY: operating on ValueStream")
-		// TODO this SUUUUUCKS, we have to duplicate the stream
-		// TODO the fact that the logic splits like this is indicative of a deeper problem
-		vs.Each(func(v interface{}) {
-			vals = append(vals, v)
-		})
+	fml("CHUNKBY: accum val:", accum, "incoming value", value, "coll contents:", t.coll)
+	chunkval := t.chunker(value)
 
-		fml("CHUNKBY: collected vals:", vals)
-
-		// TODO this is not chunkby...it should make a new group every time a new val comes back
-		if !t.chunker(vals.AsStream()) {
-			fml("CHUNKBY: chunk unfinished; appending these vals to coll:", vals)
-			t.coll = append(t.coll, vals.AsStream())
-		} else {
-			fml("CHUNKBY: passing value streams to next td:", t.coll)
-			accum, t.terminate = t.next.Reduce(accum, t.coll.AsStream())
-			t.coll = nil
-			t.coll = append(t.coll, vals.AsStream())
-		}
+	if t.first { // nothing to compare against if first pass
+		fml("CHUNKBY: first entry; appending this val to coll:", chunkval)
+		t.first = false
+		t.last = chunkval
+		t.coll = append(t.coll, value)
+	} else if t.last == chunkval {
+		fml("CHUNKBY: chunk unfinished; appending this val to coll:", chunkval)
+		t.coll = append(t.coll, value)
 	} else {
-		fml("CHUNKBY: operating on non-ValueStream")
-		if !t.chunker(value) {
-			fml("CHUNKBY: chunk unfinished; appending this val to coll:", value)
-			t.coll = append(t.coll, value)
-		} else {
-			fml("CHUNKBY: passing coll to next td:", t.coll)
-			accum, t.terminate = t.next.Reduce(accum, t.coll.AsStream())
-			t.coll = nil // TODO erm...correct way to zero out a slice?
-			t.coll = append(t.coll, value)
-		}
+		fml("CHUNKBY: chunk finished, passing coll to next td:", t.coll)
+		t.last = chunkval
+		accum, t.terminate = t.next.Reduce(accum, t.coll.AsStream())
+		t.coll = nil
+		t.coll = append(t.coll, value)
 	}
-
 	return accum, t.terminate
 }
 

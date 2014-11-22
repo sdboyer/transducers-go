@@ -52,13 +52,29 @@ func TestTransduceChunkFlatten(t *testing.T) {
 }
 
 func TestTransduceChunkChunkByFlatten(t *testing.T) {
-	chunker := func(value interface{}) bool {
+	chunker := func(value interface{}) interface{} {
 		return sum(value.(ValueStream)) > 7
 	}
 	xform := []Transducer{Chunk(3), ChunkBy(chunker), Mapcat(Flatten)}
 	result := Transduce(Range(19), make([]int, 0), xform...)
 
 	intSliceEquals(t_range(19), result, t)
+}
+
+func TestMultiChunkBy(t *testing.T) {
+	chunker := func(value interface{}) interface{} {
+		switch v := value.(int); {
+		case v < 4:
+			return "boo"
+		case v < 7:
+			return false
+		default:
+			return "boo"
+		}
+	}
+
+	result := Transduce(Range(10), make([]int, 0), ChunkBy(chunker), Map(Sum))
+	intSliceEquals([]int{6, 15, 24}, result, t)
 }
 
 func TestTransduceSample(t *testing.T) {

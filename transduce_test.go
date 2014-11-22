@@ -159,3 +159,8 @@ func TestDropDropDropWhileTake(t *testing.T) {
 
 	intSliceEquals([]int{5, 6, 7, 8, 9}, result, t)
 }
+
+func TestRemove(t *testing.T) {
+	result := Seq(Range(8), make([]int, 0), Remove(even))
+	intSliceEquals([]int{1, 3, 5, 7}, result, t)
+}

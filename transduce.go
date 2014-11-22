@@ -192,7 +192,7 @@ func Map(f Mapper) PureFuncTransducer {
 	return func(r Reducer) Reducer {
 		return func(accum interface{}, value interface{}) (interface{}, bool) {
 			fml("MAP: accum is", accum, "value is", value)
-			return r(accum, f(value).(int))
+			return r(accum, f(value))
 		}
 	}
 }
@@ -554,4 +554,13 @@ func DropWhile(f Filterer) PureFuncTransducer {
 			return r(accum, value)
 		}
 	}
+}
+
+// Remove drops items when the injected filterer function returns true.
+//
+// It is the inverse of Filter.
+func Remove(f Filterer) PureFuncTransducer {
+	return Filter(func(value interface{}) bool {
+		return !f(value)
+	})
 }

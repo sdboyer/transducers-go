@@ -319,7 +319,13 @@ type chunkBy struct {
 
 func (t *chunkBy) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
 	fml("CHUNKBY: accum val:", accum, "incoming value", value, "coll contents:", t.coll)
-	chunkval := t.chunker(value)
+	var chunkval interface{}
+	if vs, ok := value.(ValueStream); ok {
+		value = (&vs).Dup()
+		chunkval = t.chunker(vs)
+	} else {
+		chunkval = t.chunker(value)
+	}
 
 	if t.first { // nothing to compare against if first pass
 		fml("CHUNKBY: first entry; appending this val to coll:", chunkval)

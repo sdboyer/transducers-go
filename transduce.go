@@ -18,6 +18,36 @@ type ReduceStep interface {
 	Complete(accum interface{}) (result interface{})
 }
 
+// Creates a transduction pipeline from a reducing function and a stack of transducers.
+//
+// Creating the pipeline means that state in the transducers has been
+// initialized. In other words, while you can create as many pipelines as you want
+// from a stack of transducers, you have to create a new pipeline for each
+// process/collection you run.
+//
+// This function is usually called by processors (Transduce, Eduction, etc.).
+// If you're using one of those, they'll call it when the time is right.
+func CreatePipeline(r ReduceStep, tds ...Transducer) (rs ReduceStep) {
+	rs = ReduceStep(r)
+	// Because a pipeline is a series of wrapped functions, we must walk the list
+	// in reverse order and apply each transducer, starting from the bottom reducer.
+	for i := len(tds) - 1; i >= 0; i-- {
+		rs = tds[i](rs)
+	}
+
+	return
+}
+
+func (r Reducer) Reduce(accum interface{}, value interface{}) (result interface{}, terminate bool) {
+	return r(accum, value)
+}
+
+func (r Reducer) Complete(accum interface{}) (result interface{}) {
+	return accum
+}
+
+/* Transducer implementations */
+
 type map_r struct {
 	reducerBase
 	f Mapper

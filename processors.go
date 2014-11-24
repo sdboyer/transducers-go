@@ -20,3 +20,82 @@ func Transduce(vs ValueStream, init []int, tlist ...Transducer) []int {
 
 	return ret.([]int)
 }
+
+// Applies the transducer stack to the provided collection, then encapsulates
+// flow within a ValueStream, and returns the stream.
+//
+// Calling for a value on the returned ValueStream will send a value into
+// the transduction pipe. Depending on the transducer components involved,
+// a given pipeline could produce 0..N values for each input value.
+// Nevertheless, Eduction ValueStreams still must return one value per call.
+//
+// In the case that sending an input results in 0 outputs reaching the
+// bottom reducer, an Eduction will simply continue sending values to the input
+// end until a value emerges, or the input stream is exhausted. In the latter
+// case, the returned ValueStream will also indicate it is exhausted.
+//
+// If more than one value emerges for a single input, the eduction stream
+// places the additional results into a FIFO queue. Subsequent calls to
+// the stream will drain the queue before sending another value from the
+// source stream into the pipeline.
+//
+// Note that using processor with transducers that have side effects is a
+// particularly bad idea. It's also a bad idea to use it if your transduction
+// stack has a high degree of fanout, as the queue can become quite large.
+func Eduction(coll interface{}, tlist ...Transducer) ValueStream {
+	var bottom Reducer = func(accum interface{}, value interface{}) (interface{}, bool) {
+		return append(accum.([]interface{}), value), false
+	}
+
+	src := ToStream(coll)
+	pipe := CreatePipeline(bottom, tlist...)
+	var queue []interface{}
+	var input interface{}
+	var exhausted, terminate bool
+
+	return func() (value interface{}, done bool) {
+		// first, check the queue to see if it needs draining
+		if len(queue) > 0 {
+			// consume from queue - unshift slice
+			// TODO is this leaky? not sure how to reason about that
+			value, queue = queue[0], queue[1:]
+			return value, false
+		}
+
+		if exhausted || terminate {
+			// we'll get here if Complete enqueued more values after:
+			//  a) we got an empty signal from the src stream, or
+			//  b) if the pipeline returned the termination signal
+			return nil, true
+		}
+
+		for {
+			// queue is empty. feed the pipe till its not, or we exhaust src
+			input, exhausted = src()
+			if exhausted || terminate {
+				// src is exhausted, send Complete signal
+				queue = pipe.Complete(queue).([]interface{})
+				// Complete may have flushed some stuff into the accum/queue
+				if len(queue) > 0 {
+					value, queue = queue[0], queue[1:]
+					return value, false
+				}
+				// nope. so, we're done.
+				return nil, true
+			}
+
+			// temporarily use the value var
+			value, terminate = pipe.Reduce(queue, input)
+			queue = value.([]interface{})
+			if terminate {
+				// this is here because it's less horrifying than the alternative
+				queue = pipe.Complete(queue).([]interface{})
+			}
+
+			if len(queue) > 0 {
+				value, queue = queue[0], queue[1:]
+				return value, false
+			}
+		}
+	}
+}

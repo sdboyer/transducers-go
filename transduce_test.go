@@ -215,3 +215,10 @@ func TestStreamDup(t *testing.T) {
 	intSliceEquals([]int{0, 1, 2}, res1, t)
 	intSliceEquals([]int{0, 1, 2}, res2, t)
 }
+
+// Eduction tests cover 19 variations - 5 base (1 input: {1 out, 0 out, 0..1 out, 1..n out, 0..n out}),
+// permuted with a transducer that flushes on complete, and an early terminator. only 19 instead of
+// 20 because the 1:0 case cannot possibly have anything that
+func TestEduction(t *testing.T) {
+
+}

@@ -253,35 +253,33 @@ func TestStreamDup(t *testing.T) {
 	intSliceEquals([]int{0, 1, 2}, res2, t)
 }
 
-// Eduction tests cover 19 variations - 5 base (1 input: {1 out, 0 out, 0..1 out, 1..n out, 0..n out}),
-// permuted with a transducer that flushes on complete, and an early terminator. only 19 instead of
-// 20 because the 1:0 case cannot possibly have anything that
 func TestEduction(t *testing.T) {
-	var xf []Transducer
 	var res ValueStream
 
 	// simple 1:1
-	xf = []Transducer{Map(inc)}
-	res = Eduction(Range(5), dt(xf)...)
+	xf1 := []Transducer{Map(inc)}
+	res = Eduction(Range(5), dt(xf1)...)
 	streamEquals(toi(1, 2, 3, 4, 5), res, t)
 
 	// contractor
-	xf = append(xf, Filter(even))
-	res = Eduction(Range(5), dt(xf)...)
+	xf2 := append(xf1, Filter(even))
+	res = Eduction(Range(5), dt(xf2)...)
 	streamEquals(toi(2, 4), res, t)
 
 	// expander
-	xf = append(xf, Mapcat(Range))
-	res = Eduction(Range(5), dt(xf)...)
+	xf3 := append(xf2, Mapcat(Range))
+	res = Eduction(Range(5), dt(xf3)...)
 	streamEquals(toi(0, 1, 0, 1, 2, 3), res, t)
 
 	// terminator
-	xf = append(xf, Take(5))
-	res = Eduction(Range(5), dt(xf)...)
+	xf4 := append(xf3, Take(5))
+	res = Eduction(Range(5), dt(xf4)...)
 	streamEquals(toi(0, 1, 0, 1, 2), res, t)
 
 	// stateful/flusher
-	xf = append(xf, Chunk(2))
-	res = Eduction(Range(5), dt(xf)...)
-	// streamEquals(toi(toi(0, 1), toi(0, 1), 2), res, t) need recursive stream flattening...
+	xf5 := append(xf4, Chunk(2), Mapcat(Flatten)) // add flatten b/c no auto-recursive compare
+	res = Eduction(Range(5), dt(xf5)...)
+	streamEquals(toi(0, 1, 0, 1, 2), res, t)
+
+	// feels like there are more permutations to check
 }

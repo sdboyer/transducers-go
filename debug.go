@@ -59,12 +59,7 @@ func (r *topLogger) Complete(accum interface{}) interface{} {
 func (r *topLogger) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
 	// if the transducer produces a ValueStream, dup and dump it. (so, already not infinite-safe)
 	if vs, ok := value.(ValueStream); ok {
-		inner := make([]interface{}, 0)
-		value = (&vs).Dup()
-		vs.Each(func(v interface{}) {
-			inner = append(inner, v)
-		})
-		r.values = append(r.values, inner)
+		r.values = append(r.values, (&vs).ToSlice())
 	} else {
 		r.values = append(r.values, value)
 	}

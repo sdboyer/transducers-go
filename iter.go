@@ -18,6 +18,23 @@ func (vs ValueStream) Each(f func(interface{})) {
 	}
 }
 
+// Recursively reads this stream out into an []interface{}.
+//
+// Will consume until the stream says its done - unsafe for infinite streams,
+// and will block if the stream is based on a blocking datasource (e.g., chan).
+func (vs *ValueStream) ToSlice() (into []interface{}) {
+	dup := vs.Dup()
+	for value, done := dup(); !done; value, done = dup() {
+		if ivs, ok := value.(ValueStream); ok {
+			into = append(into, (&ivs).ToSlice())
+		} else {
+			into = append(into, value)
+		}
+	}
+
+	return into
+}
+
 // Duplicates a ValueStream by moving the pointer to the original stream
 // to an internal var, passing calls from either dup'd stream to the
 // origin stream, and holding values provided from origin until both dup'd

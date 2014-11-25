@@ -1,9 +1,6 @@
 package transduce
 
-import (
-	"fmt"
-	"reflect"
-)
+import "reflect"
 
 // Interleaves logging transducers into the provided transducer stack.
 //
@@ -31,7 +28,6 @@ func AttachLoggers(logger func(string, ...interface{}), tds ...Transducer) []Tra
 		newstack = append(newstack, logtd(tl, logger))
 	}
 
-	fmt.Println(newstack)
 	return newstack
 }
 
@@ -45,11 +41,17 @@ type topLogger struct {
 
 func (r *topLogger) Complete(accum interface{}) interface{} {
 	accum = r.next.Complete(accum)
-	r.logger("SRC -> %v -> %T ->", r.values, r.next)
+	r.logger("Transducer stack: %T", r.next)
+	for _, t := range r.logtds {
+		r.logger(" | %T ", t.next)
+	}
+	r.logger("\n")
+
+	r.logger("SRC -> %v\n\t%T", r.values, r.next)
 	for _, t := range r.logtds {
 		t.dump()
 	}
-	r.logger("END\n")
+	r.logger("\nEND\n")
 
 	return accum
 }
@@ -117,5 +119,5 @@ func (r *reduceLogger) Reduce(accum interface{}, value interface{}) (interface{}
 }
 
 func (r *reduceLogger) dump() {
-	r.logger(" %v -> %T ->", r.values, r.next)
+	r.logger(" -> %v\n\t%T", r.values, r.next)
 }

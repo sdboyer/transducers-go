@@ -1,9 +1,20 @@
 package transduce
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 var ints = []int{1, 2, 3, 4, 5}
 var evens = []int{2, 4}
+
+func printf(s string, ph ...interface{}) {
+	fmt.Printf(s, ph...)
+}
+
+func dt(t []Transducer) []Transducer {
+	return AttachLoggers(printf, t...)
+}
 
 func intSliceEquals(a []int, b []int, t *testing.T) {
 	if len(a) != len(b) {
@@ -27,7 +38,8 @@ func TestTransduceMF(t *testing.T) {
 }
 
 func TestTransduceMapFilterMapcat(t *testing.T) {
-	result := Transduce(ToStream(ints), make([]int, 0), Filter(even), Map(inc), Mapcat(Range))
+	xform := []Transducer{Filter(even), Map(inc), Mapcat(Range)}
+	result := Transduce(ToStream(ints), make([]int, 0), dt(xform)...)
 
 	intSliceEquals([]int{0, 1, 2, 0, 1, 2, 3, 4}, result, t)
 }
@@ -35,17 +47,17 @@ func TestTransduceMapFilterMapcat(t *testing.T) {
 func TestTransduceMapFilterMapcatDedupe(t *testing.T) {
 	xform := []Transducer{Filter(even), Map(inc), Mapcat(Range), Dedupe()}
 
-	result := Transduce(ToStream(ints), make([]int, 0), xform...)
+	result := Transduce(ToStream(ints), make([]int, 0), dt(xform)...)
 	intSliceEquals([]int{0, 1, 2, 3, 4}, result, t)
 
 	// Dedupe is stateful. Do it twice to demonstrate that's handled
-	result2 := Transduce(ToStream(ints), make([]int, 0), xform...)
+	result2 := Transduce(ToStream(ints), make([]int, 0), dt(xform)...)
 	intSliceEquals([]int{0, 1, 2, 3, 4}, result2, t)
 }
 
 func TestTransduceChunkFlatten(t *testing.T) {
 	xform := []Transducer{Chunk(3), Mapcat(Flatten)}
-	result := Transduce(Range(6), make([]int, 0), xform...)
+	result := Transduce(Range(6), make([]int, 0), dt(xform)...)
 	// TODO crappy test b/c the steps are logical inversions - need to improv on Seq for better test
 
 	intSliceEquals(([]int{0, 1, 2, 3, 4, 5}), result, t)
@@ -56,7 +68,7 @@ func TestTransduceChunkChunkByFlatten(t *testing.T) {
 		return sum(value.(ValueStream)) > 7
 	}
 	xform := []Transducer{Chunk(3), ChunkBy(chunker), Mapcat(Flatten)}
-	result := Transduce(Range(19), make([]int, 0), xform...)
+	result := Transduce(Range(19), make([]int, 0), dt(xform)...)
 
 	intSliceEquals(t_range(19), result, t)
 }
@@ -73,7 +85,8 @@ func TestMultiChunkBy(t *testing.T) {
 		}
 	}
 
-	result := Transduce(Range(10), make([]int, 0), ChunkBy(chunker), Map(Sum))
+	xform := []Transducer{ChunkBy(chunker), Map(Sum)}
+	result := Transduce(Range(10), make([]int, 0), dt(xform)...)
 	intSliceEquals([]int{6, 15, 24}, result, t)
 }
 
@@ -109,7 +122,9 @@ func TestKeep(t *testing.T) {
 		return val
 	}
 
-	result := Transduce(ToStream(v), make([]int, 0), Keep(keepf), Map(mapf))
+	xform := []Transducer{Keep(keepf), Map(mapf)}
+
+	result := Transduce(ToStream(v), make([]int, 0), dt(xform)...)
 
 	intSliceEquals([]int{0, 1, 2, 15}, result, t)
 }
@@ -144,17 +159,18 @@ func TestReplace(t *testing.T) {
 		"eighteen": 41,
 	}
 
-	result := Transduce(Range(19), make([]int, 0), Replace(tostrings), Replace(toints))
+	xform := []Transducer{Replace(tostrings), Replace(toints)}
+	result := Transduce(Range(19), make([]int, 0), dt(xform)...)
 
 	intSliceEquals([]int{0, 1, 55, 3, 4, 5, 35, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 41}, result, t)
 }
 
 func TestMapChunkTakeFlatten(t *testing.T) {
-	td := []Transducer{Map(inc), Chunk(2), Take(2), Mapcat(Flatten)}
-	result := Transduce(Range(6), make([]int, 0), td...)
+	xform := []Transducer{Map(inc), Chunk(2), Take(2), Mapcat(Flatten)}
+	result := Transduce(Range(6), make([]int, 0), dt(xform)...)
 	intSliceEquals([]int{1, 2, 3, 4}, result, t)
 
-	result2 := Transduce(Range(6), make([]int, 0), td...)
+	result2 := Transduce(Range(6), make([]int, 0), dt(xform)...)
 	intSliceEquals([]int{1, 2, 3, 4}, result2, t)
 }
 
@@ -171,7 +187,7 @@ func TestDropDropDropWhileTake(t *testing.T) {
 		return value.(int) < 5
 	}
 	td := []Transducer{Drop(1), Drop(1), DropWhile(dw), Take(5)}
-	result := Transduce(Range(50), make([]int, 0), td...)
+	result := Transduce(Range(50), make([]int, 0), dt(td)...)
 
 	intSliceEquals([]int{5, 6, 7, 8, 9}, result, t)
 }
@@ -220,5 +236,5 @@ func TestStreamDup(t *testing.T) {
 // permuted with a transducer that flushes on complete, and an early terminator. only 19 instead of
 // 20 because the 1:0 case cannot possibly have anything that
 func TestEduction(t *testing.T) {
-
+	//simple := []Transducer{}
 }

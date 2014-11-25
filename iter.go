@@ -129,6 +129,8 @@ func ToStream(collection interface{}) ValueStream {
 		return iteratorToValueStream(&IntSliceIterator{slice: c})
 	case []interface{}:
 		return ValueSlice(c).AsStream()
+	case ValueStream:
+		return c
 	default:
 		panic("not supported...yet")
 	}

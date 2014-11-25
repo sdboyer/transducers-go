@@ -29,6 +29,27 @@ func intSliceEquals(a []int, b []int, t *testing.T) {
 
 }
 
+func toi(i ...interface{}) []interface{} {
+	return i
+}
+
+func streamEquals(expected []interface{}, s ValueStream, t *testing.T) {
+	for k, v := range expected {
+		val, done := s()
+		if done {
+			t.Errorf("Stream terminated before end of slice reached")
+		}
+		if v != val {
+			t.Errorf("Error on index %v: expected %v got %v", k, v, val)
+		}
+	}
+
+	_, done := s()
+	if !done {
+		t.Errorf("Exhausted slice, but stream had more values")
+	}
+}
+
 func TestTransduceMF(t *testing.T) {
 	mf := Transduce(ToStream(ints), make([]int, 0), Map(inc), Filter(even))
 	fm := Transduce(ToStream(ints), make([]int, 0), Filter(even), Map(inc))
@@ -236,5 +257,31 @@ func TestStreamDup(t *testing.T) {
 // permuted with a transducer that flushes on complete, and an early terminator. only 19 instead of
 // 20 because the 1:0 case cannot possibly have anything that
 func TestEduction(t *testing.T) {
-	//simple := []Transducer{}
+	var xf []Transducer
+	var res ValueStream
+
+	// simple 1:1
+	xf = []Transducer{Map(inc)}
+	res = Eduction(Range(5), dt(xf)...)
+	streamEquals(toi(1, 2, 3, 4, 5), res, t)
+
+	// contractor
+	xf = append(xf, Filter(even))
+	res = Eduction(Range(5), dt(xf)...)
+	streamEquals(toi(2, 4), res, t)
+
+	// expander
+	xf = append(xf, Mapcat(Range))
+	res = Eduction(Range(5), dt(xf)...)
+	streamEquals(toi(0, 1, 0, 1, 2, 3), res, t)
+
+	// terminator
+	xf = append(xf, Take(5))
+	res = Eduction(Range(5), dt(xf)...)
+	streamEquals(toi(0, 1, 0, 1, 2), res, t)
+
+	// stateful/flusher
+	xf = append(xf, Chunk(2))
+	res = Eduction(Range(5), dt(xf)...)
+	// streamEquals(toi(toi(0, 1), toi(0, 1), 2), res, t) need recursive stream flattening...
 }

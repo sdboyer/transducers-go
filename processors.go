@@ -1,11 +1,12 @@
 package transduce
 
 // Transduce performs a non-lazy traversal/reduction over the provided value stream.
-func Transduce(vs ValueStream, init []int, tlist ...Transducer) []int {
+func Transduce(coll interface{}, bottom ReduceStep, tlist ...Transducer) interface{} {
 	// Final reducing func - append to slice
-	t := CreatePipeline(Append(), tlist...)
+	t := CreatePipeline(bottom, tlist...)
 
-	var ret interface{} = init
+	vs := ToStream(coll)
+	var ret interface{} = t.Init()
 	var terminate bool
 
 	for v, done := vs(); !done; v, done = vs() {
@@ -18,7 +19,7 @@ func Transduce(vs ValueStream, init []int, tlist ...Transducer) []int {
 
 	ret = t.Complete(ret)
 
-	return ret.([]int)
+	return ret
 }
 
 // Applies the transducer stack to the provided collection, then encapsulates

@@ -8,7 +8,8 @@ type Reducer func(accum interface{}, value interface{}) (result interface{}, ter
 // A transducer transforms a reducing function into a new reducing function.
 type Transducer func(ReduceStep) ReduceStep
 
-// TODO add Init method
+// This is separated out because, while Transducers must support Init() (in order to pass
+// the call along), not all processors require Init, so they may take a partial step instead.
 type ReduceStep interface {
 	// The primary reducing step function, called during normal operation.
 	Reduce(accum interface{}, value interface{}) (result interface{}, terminate bool) // Reducer
@@ -16,13 +17,17 @@ type ReduceStep interface {
 	// Complete is called when the input has been exhausted; stateful transducers
 	// should flush any held state (e.g. values awaiting a full chunk) through here.
 	Complete(accum interface{}) (result interface{})
+
+	// Certain processors will call this to get an initial value for the accumulator.
+	// TODO maybe should split this out to separate interface
+	Init() interface{}
 }
 
 // Creates a transduction pipeline from a reducing function and a stack of transducers.
 //
-// Creating the pipeline means that state in the transducers has been
-// initialized. In other words, while you can create as many pipelines as you want
-// from a stack of transducers, you have to create a new pipeline for each
+// Creating the pipeline means that state in the transducers has been initialized.
+// In other words, while you can create as many pipelines as you want from a
+// a stack of transducers, you have to create a new pipeline for each
 // process/collection you run.
 //
 // This function is usually called by processors (Transduce, Eduction, etc.).
@@ -44,6 +49,12 @@ func (r Reducer) Reduce(accum interface{}, value interface{}) (result interface{
 
 func (r Reducer) Complete(accum interface{}) (result interface{}) {
 	return accum
+}
+
+// TODO binding this to the general function type is maybe not the best idea, but it's simple
+// and works for now
+func (r Reducer) Init() interface{} {
+	return make([]interface{}, 0)
 }
 
 /* Transducer implementations */
@@ -115,6 +126,10 @@ func (r append_bottom) Reduce(accum interface{}, value interface{}) (interface{}
 
 func (r append_bottom) Complete(accum interface{}) interface{} {
 	return accum
+}
+
+func (r append_bottom) Init() interface{} {
+	return make([]interface{}, 0)
 }
 
 func Append() ReduceStep {
@@ -241,6 +256,10 @@ func (t *chunk) Complete(accum interface{}) interface{} {
 	return t.next.Complete(accum)
 }
 
+func (t *chunk) Init() interface{} {
+	return t.next.Init()
+}
+
 // Condense the traversed collection by partitioning it into chunks,
 // represented by ValueStreams. A new contiguous stream is created every time
 // the injected filter function returns a different value from the previous.
@@ -297,6 +316,10 @@ func (t *chunkBy) Complete(accum interface{}) interface{} {
 	}
 
 	return t.next.Complete(accum)
+}
+
+func (t *chunkBy) Init() interface{} {
+	return t.next.Init()
 }
 
 type randomSample struct {

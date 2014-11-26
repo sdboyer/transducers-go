@@ -39,6 +39,10 @@ type topLogger struct {
 	nextType reflect.Type // just store this so we're not constantly recalculating
 }
 
+func (r *topLogger) Init() interface{} {
+	return r.next.Init()
+}
+
 func (r *topLogger) Complete(accum interface{}) interface{} {
 	accum = r.next.Complete(accum)
 	r.logger("Transducer stack: %T", r.next)
@@ -86,6 +90,10 @@ type reduceLogger struct {
 	values []interface{}
 	logger func(string, ...interface{})
 	next   ReduceStep
+}
+
+func (r *reduceLogger) Init() interface{} {
+	return r.next.Init()
 }
 
 func (r *reduceLogger) Complete(accum interface{}) interface{} {

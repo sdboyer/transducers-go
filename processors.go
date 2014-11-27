@@ -100,3 +100,53 @@ func Eduction(coll interface{}, tlist ...Transducer) ValueStream {
 		}
 	}
 }
+
+// Given a channel, apply the transducer stack to values it produces,
+// emitting values out the other end through the returned channel.
+//
+// This processor will spawn a separate goroutine that runs the transduction.
+// This goroutine consumes on the provided chan, runs transduction, and sends
+// resultant values into the returned chan. Thus, make sure that you're filling
+// the input channel and consuming on the resultant channel from separate
+// goroutines.
+//
+// The second parameter determines the buffering of the returned channel (it is
+// passed directly to the make() call).
+func Go(c <-chan interface{}, retbuf int, tlist ...Transducer) <-chan interface{} {
+	out := make(chan interface{}, retbuf)
+	pipe := CreatePipeline(chanReducer{c: out}, tlist...)
+
+	var accum struct{} // accum is unused in this mode
+	var terminate bool
+
+	go func() {
+		for v := range c {
+			_, terminate = pipe.Reduce(accum, v)
+			if terminate {
+				break
+			}
+		}
+
+		pipe.Complete(accum)
+	}()
+
+	return out
+}
+
+type chanReducer struct {
+	c chan interface{}
+}
+
+func (c chanReducer) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+	c.c <- value
+	return accum, false
+}
+
+func (c chanReducer) Complete(accum interface{}) interface{} {
+	close(c.c)
+	return accum
+}
+
+func (c chanReducer) Init() interface{} {
+	return nil
+}

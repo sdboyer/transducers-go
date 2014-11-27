@@ -84,6 +84,13 @@ func (vs *ValueStream) Dup() ValueStream {
 	}
 }
 
+func StreamIntoChan(vs ValueStream, c chan<- interface{}) {
+	vs.Each(func(v interface{}) {
+		c <- v
+	})
+	close(c)
+}
+
 // Takes a ValueStream that (presumably) produces other ValueStreams, and,
 // ostensibly for the caller, flattens them together into a single ValueStream
 // by walking depth-first through an arbitrarily deep set of ValueStreams until

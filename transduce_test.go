@@ -29,6 +29,12 @@ func tb() ReduceStep {
 	return b
 }
 
+func rchan(i int) chan interface{} {
+	c := make(chan interface{}, 0)
+	go StreamIntoChan(Range(i), c)
+	return c
+}
+
 func intSliceEquals(a []int, b []int, t *testing.T) {
 	if len(a) != len(b) {
 		t.Error("Slices not even length")
@@ -59,6 +65,24 @@ func streamEquals(expected []interface{}, s ValueStream, t *testing.T) {
 	_, done := s()
 	if !done {
 		t.Errorf("Exhausted slice, but stream had more values")
+	}
+}
+
+func chanEquals(expected []interface{}, c <-chan interface{}, t *testing.T) {
+	var i int
+	for val := range c {
+		if len(expected) <= i {
+			t.Errorf("Exhausted slice, but channel had more values")
+		}
+
+		if val != expected[i] {
+			t.Errorf("Error on index %v: expected %v got %v", i, expected[i], val)
+		}
+		i++
+	}
+
+	if i < len(expected)-1 {
+		t.Errorf("Expected slice was longer than list of channel vals")
 	}
 }
 
@@ -292,6 +316,47 @@ func TestEduction(t *testing.T) {
 	xf5 := append(xf4, Chunk(2), Mapcat(Flatten)) // add flatten b/c no auto-recursive compare
 	res = Eduction(Range(5), dt(xf5)...)
 	streamEquals(toi(0, 1, 0, 1, 2), res, t)
+
+	// feels like there are more permutations to check
+}
+
+func TestGo(t *testing.T) {
+	var res <-chan interface{}
+
+	// simple 1:1
+	xf1 := []Transducer{Map(inc)}
+	res = Go(rchan(5), 0, dt(xf1)...)
+	chanEquals(toi(1, 2, 3, 4, 5), res, t)
+	res = Go(rchan(5), 2, dt(xf1)...)
+	chanEquals(toi(1, 2, 3, 4, 5), res, t)
+
+	// contractor
+	xf2 := append(xf1, Filter(even))
+	res = Go(rchan(5), 0, dt(xf2)...)
+	chanEquals(toi(2, 4), res, t)
+	res = Go(rchan(5), 2, dt(xf2)...)
+	chanEquals(toi(2, 4), res, t)
+
+	// expander
+	xf3 := append(xf2, Mapcat(Range))
+	res = Go(rchan(5), 0, dt(xf3)...)
+	chanEquals(toi(0, 1, 0, 1, 2, 3), res, t)
+	res = Go(rchan(5), 2, dt(xf3)...)
+	chanEquals(toi(0, 1, 0, 1, 2, 3), res, t)
+
+	// terminator
+	xf4 := append(xf3, Take(5))
+	res = Go(rchan(5), 0, dt(xf4)...)
+	chanEquals(toi(0, 1, 0, 1, 2), res, t)
+	res = Go(rchan(5), 2, dt(xf4)...)
+	chanEquals(toi(0, 1, 0, 1, 2), res, t)
+
+	// stateful/flusher
+	xf5 := append(xf4, Chunk(2), Mapcat(Flatten)) // add flatten b/c no auto-recursive compare
+	res = Go(rchan(5), 0, dt(xf5)...)
+	chanEquals(toi(0, 1, 0, 1, 2), res, t)
+	res = Go(rchan(5), 2, dt(xf5)...)
+	chanEquals(toi(0, 1, 0, 1, 2), res, t)
 
 	// feels like there are more permutations to check
 }

@@ -35,6 +35,18 @@ func (vs *ValueStream) ToSlice() (into []interface{}) {
 	return into
 }
 
+func ToSlice(vs ValueStream) (into []interface{}) {
+	for value, done := vs(); !done; value, done = vs() {
+		if ivs, ok := value.(ValueStream); ok {
+			into = append(into, (&ivs).ToSlice())
+		} else {
+			into = append(into, value)
+		}
+	}
+
+	return into
+}
+
 // Duplicates a ValueStream by moving the pointer to the original stream
 // to an internal var, passing calls from either dup'd stream to the
 // origin stream, and holding values provided from origin until both dup'd

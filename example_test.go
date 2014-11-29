@@ -97,3 +97,13 @@ func Example_clojureParity() {
 	// Eduction in a golang context. I didn't replicate the latter because it's a use pattern
 	// that is awkward with strict typing, and basically the same as Transduce.
 }
+
+func Example_transduce() {
+	// Transducing does an immediate (non-lazy) application of the transduction
+	// stack to the incoming ValueStream.
+
+	// Increments [0 1 2 3 4] by 1, then filters out odd values.
+	fmt.Println(Transduce(Range(6), AppendReducer(), Map(Inc), Filter(Even)))
+	// Output:
+	// [2 4 6]
+}

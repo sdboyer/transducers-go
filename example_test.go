@@ -64,6 +64,11 @@ func Example_clojureParity() {
 	// set of values at each stage of transduction:
 	// xform = AttachLoggers(fmt.Printf, xform...)
 
+	// NB: the original clojure gists also have (sequence ...) and (into []...) processors.
+	// I didn't replicate sequence because, as best I can figure, it's redundant with
+	// Eduction in a golang context. I didn't replicate the latter because it's a use pattern
+	// that is awkward with strict typing, and basically the same as Transduce.
+
 	// reduce immediately, appending the results of transduction into an int slice.
 	fmt.Println(Transduce(data, AppendReducer(), xform...))
 	// produces first line of Output: [36 200 10]
@@ -91,11 +96,6 @@ func Example_clojureParity() {
 	// 36
 	// 200
 	// 10
-
-	// NB: the original clojure gists also have (sequence ...) and (into []...) processors.
-	// I didn't replicate sequence because, as best I can figure, it's redundant with
-	// Eduction in a golang context. I didn't replicate the latter because it's a use pattern
-	// that is awkward with strict typing, and basically the same as Transduce.
 }
 
 func Example_transduce() {

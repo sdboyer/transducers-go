@@ -16,9 +16,11 @@ func AppendReducer() ReduceStep {
 	return b
 }
 
-func ExampleClojureParity() {
-	// mirrors Rich Hickey's original "transducerfun.clj" gist: https://gist.github.com/richhickey/b5aefa622180681e1c81
-	// note that that syntax is out of date and will not run; this does: https://gist.github.com/sdboyer/9fca652f492257f35a41
+func Example_clojureParity() {
+	// mirrors Rich Hickey's original "transducerfun.clj" gist:
+	//  https://gist.github.com/richhickey/b5aefa622180681e1c81
+	// note that that syntax is out of date and will not run, but this does:
+	//  https://gist.github.com/sdboyer/9fca652f492257f35a41
 	xform := []Transducer{
 		Map(Inc),
 		Filter(Even),

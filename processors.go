@@ -134,7 +134,7 @@ func Go(c <-chan interface{}, retbuf int, tlist ...Transducer) <-chan interface{
 }
 
 type chanReducer struct {
-	c chan interface{}
+	c chan<- interface{}
 }
 
 func (c chanReducer) Reduce(accum interface{}, value interface{}) (interface{}, bool) {

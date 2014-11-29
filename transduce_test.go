@@ -87,22 +87,22 @@ func chanEquals(expected []interface{}, c <-chan interface{}, t *testing.T) {
 }
 
 func TestTransduceMF(t *testing.T) {
-	mf := Transduce(ToStream(ints), tb(), Map(inc), Filter(even)).([]int)
-	fm := Transduce(ToStream(ints), tb(), Filter(even), Map(inc)).([]int)
+	mf := Transduce(ToStream(ints), tb(), Map(Inc), Filter(Even)).([]int)
+	fm := Transduce(ToStream(ints), tb(), Filter(Even), Map(Inc)).([]int)
 
 	intSliceEquals([]int{2, 4, 6}, mf, t)
 	intSliceEquals([]int{3, 5}, fm, t)
 }
 
 func TestTransduceMapFilterMapcat(t *testing.T) {
-	xform := []Transducer{Filter(even), Map(inc), Mapcat(Range)}
+	xform := []Transducer{Filter(Even), Map(Inc), Mapcat(Range)}
 	result := Transduce(ToStream(ints), tb(), dt(xform)...).([]int)
 
 	intSliceEquals([]int{0, 1, 2, 0, 1, 2, 3, 4}, result, t)
 }
 
 func TestTransduceMapFilterMapcatDedupe(t *testing.T) {
-	xform := []Transducer{Filter(even), Map(inc), Mapcat(Range), Dedupe()}
+	xform := []Transducer{Filter(Even), Map(Inc), Mapcat(Range), Dedupe()}
 
 	result := Transduce(ToStream(ints), tb(), dt(xform)...).([]int)
 	intSliceEquals([]int{0, 1, 2, 3, 4}, result, t)
@@ -188,7 +188,7 @@ func TestKeep(t *testing.T) {
 
 func TestKeepIndexed(t *testing.T) {
 	keepf := func(index int, value interface{}) interface{} {
-		if !even(index) {
+		if !Even(index) {
 			return nil
 		}
 		return index * value.(int)
@@ -223,7 +223,7 @@ func TestReplace(t *testing.T) {
 }
 
 func TestMapChunkTakeFlatten(t *testing.T) {
-	xform := []Transducer{Map(inc), Chunk(2), Take(2), Mapcat(Flatten)}
+	xform := []Transducer{Map(Inc), Chunk(2), Take(2), Mapcat(Flatten)}
 	result := Transduce(Range(6), tb(), dt(xform)...).([]int)
 	intSliceEquals([]int{1, 2, 3, 4}, result, t)
 
@@ -250,7 +250,7 @@ func TestDropDropDropWhileTake(t *testing.T) {
 }
 
 func TestRemove(t *testing.T) {
-	result := Transduce(Range(8), tb(), Remove(even)).([]int)
+	result := Transduce(Range(8), tb(), Remove(Even)).([]int)
 	intSliceEquals([]int{1, 3, 5, 7}, result, t)
 }
 
@@ -293,12 +293,12 @@ func TestEduction(t *testing.T) {
 	var res ValueStream
 
 	// simple 1:1
-	xf1 := []Transducer{Map(inc)}
+	xf1 := []Transducer{Map(Inc)}
 	res = Eduction(Range(5), dt(xf1)...)
 	streamEquals(toi(1, 2, 3, 4, 5), res, t)
 
 	// contractor
-	xf2 := append(xf1, Filter(even))
+	xf2 := append(xf1, Filter(Even))
 	res = Eduction(Range(5), dt(xf2)...)
 	streamEquals(toi(2, 4), res, t)
 
@@ -324,14 +324,14 @@ func TestGo(t *testing.T) {
 	var res <-chan interface{}
 
 	// simple 1:1
-	xf1 := []Transducer{Map(inc)}
+	xf1 := []Transducer{Map(Inc)}
 	res = Go(rchan(5), 0, dt(xf1)...)
 	chanEquals(toi(1, 2, 3, 4, 5), res, t)
 	res = Go(rchan(5), 2, dt(xf1)...)
 	chanEquals(toi(1, 2, 3, 4, 5), res, t)
 
 	// contractor
-	xf2 := append(xf1, Filter(even))
+	xf2 := append(xf1, Filter(Even))
 	res = Go(rchan(5), 0, dt(xf2)...)
 	chanEquals(toi(2, 4), res, t)
 	res = Go(rchan(5), 2, dt(xf2)...)

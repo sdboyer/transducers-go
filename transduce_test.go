@@ -8,12 +8,8 @@ import (
 var ints = []int{1, 2, 3, 4, 5}
 var evens = []int{2, 4}
 
-func printf(s string, ph ...interface{}) {
-	fmt.Printf(s, ph...)
-}
-
 func dt(t []Transducer) []Transducer {
-	return AttachLoggers(printf, t...)
+	return AttachLoggers(fmt.Printf, t...)
 }
 
 // tb == testbottom. simple appender

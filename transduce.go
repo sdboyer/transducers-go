@@ -129,7 +129,7 @@ func (r append_bottom) Complete(accum interface{}) interface{} {
 }
 
 func (r append_bottom) Init() interface{} {
-	return make([]interface{}, 0)
+	return make([]int, 0)
 }
 
 func Append() ReduceStep {
@@ -539,5 +539,56 @@ func Remove(f Filterer) Transducer {
 		return remove{filter{reducerBase{r}, func(value interface{}) bool {
 			return !f(value)
 		}}}
+	}
+}
+
+type escape struct {
+	reducerBase
+	f   Filterer
+	c   chan<- interface{}
+	coc bool
+}
+
+func (r escape) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+	var check bool
+	if vs, ok := value.(ValueStream); ok {
+		value = (&vs).Dup()
+		check = r.f(vs)
+	} else {
+		check = r.f(value)
+	}
+
+	if check {
+		r.c <- value
+		return accum, false
+	} else {
+		return r.next.Reduce(accum, value)
+	}
+}
+
+func (r escape) Complete(accum interface{}) interface{} {
+	if r.coc {
+		close(r.c)
+	}
+	return r.next.Complete(accum)
+}
+
+// A Escape transducer takes a filter func and a send-only value channel. If
+// the filtering func returns true, it allows the value to 'escape' from the
+// current transduction process and into the channel - which itself may be,
+// though is not necessarily, the entry point to a transducing process itself.
+// If the filtering func returns false, then the value is passed along to the
+// next reducing step unchanged.
+//
+// Obviously, this transducer has side effects.
+//
+// The third parameter governs whether the passed channel is closed when the
+// Escape reduce step's Complete() method is called (which occurs when the
+// transducing process this is involved is complete). This is very useful for
+// auto-cleanup, but could cause panics (send on closed channel) if the channel
+// is being sent to from elsewhere. Be cognizant.
+func Escape(f Filterer, c chan<- interface{}, closeOnComplete bool) Transducer {
+	return func(r ReduceStep) ReduceStep {
+		return escape{reducerBase{r}, f, c, closeOnComplete}
 	}
 }

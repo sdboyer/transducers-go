@@ -268,6 +268,20 @@ func TestFlattenValueStream(t *testing.T) {
 	intSliceEquals(t_range(9), flattened, t)
 }
 
+func TestEscape(t *testing.T) {
+	c := make(chan interface{}, 0)
+	res := Go(rchan(5), 0, dt([]Transducer{Escape(Even, c, true)})...)
+	go chanEquals(toi(0, 2, 4), c, t)
+	chanEquals(toi(1, 3), res, t)
+
+	// connect two transduction processes together
+	c = make(chan interface{}, 0)
+	res1 := Go(rchan(5), 0, dt([]Transducer{Escape(Even, c, true)})...)
+	res2 := Go(c, 0, dt([]Transducer{Map(Inc), Map(Inc), Map(Inc)})...)
+	go chanEquals(toi(1, 3), res1, t)
+	go chanEquals(toi(3, 5, 7), res2, t)
+}
+
 func TestStreamDup(t *testing.T) {
 	stream := Range(3)
 	dupd := (&stream).Dup()

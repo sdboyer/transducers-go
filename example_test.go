@@ -1,20 +1,6 @@
 package transduce
 
-import (
-	"fmt"
-)
-
-func AppendReducer() ReduceStep {
-	b := BareReducer()
-	b.R = func(accum interface{}, value interface{}) (interface{}, bool) {
-		return append(accum.([]interface{}), value), false
-	}
-	b.I = func() interface{} {
-		return make([]interface{}, 0)
-	}
-
-	return b
-}
+import "fmt"
 
 func Example_clojureParity() {
 	// mirrors Rich Hickey's original "transducerfun.clj" gist:
@@ -71,7 +57,7 @@ func Example_clojureParity() {
 	// strict typing, and is readily accomplished via Transduce.
 
 	// reduce immediately, appending the results of transduction into an int slice.
-	fmt.Println(Transduce(data, AppendReducer(), xform...))
+	fmt.Println(Transduce(data, Append(), xform...))
 	// produces first line of Output: [36 200 10]
 
 	// Eduction takes the same transduction stack, but operates lazily - it returns
@@ -104,7 +90,41 @@ func Example_transduce() {
 	// stack to the incoming ValueStream.
 
 	// Increments [0 1 2 3 4] by 1, then filters out odd values.
-	fmt.Println(Transduce(Range(6), AppendReducer(), Map(Inc), Filter(Even)))
+	fmt.Println(Transduce(Range(6), Append(), Map(Inc), Filter(Even)))
 	// Output:
 	// [2 4 6]
+}
+
+func Example_connectedProcesses() {
+	// The Escape transducer allows values in a transduction process to "escape"
+	// partway through processing into a channel - which can be used to feed another
+	// transduction process.
+
+	c := make(chan interface{}, 0)
+	input := make(chan interface{}, 0)
+	// send [0 1 2 3 4] into the input channel in separate goroutine
+	go StreamIntoChan(Range(5), input)
+	// connect c's input end to Escape transducer, start transduction in goroutine
+	out1 := Go(input, 0, Escape(Even, c, true))
+	// connect c's output end to a second transduction process in goroutine
+	out2 := Go(c, 0, Map(Inc), Map(Inc), Map(Inc))
+
+	slice1, slice2 := make([]int, 0), make([]int, 0)
+	// Consume this in a separate goroutine because it's sorta in the middle
+	go func() {
+		for v := range out1 {
+			slice1 = append(slice1, v.(int))
+		}
+	}()
+
+	// Safe to consume this chan in the calling goroutine because it's at the bottom
+	for v := range out2 {
+		slice2 = append(slice2, v.(int))
+	}
+
+	fmt.Println(slice1)
+	fmt.Println(slice2)
+	// Output:
+	// [1 3]
+	// [3 5 7]
 }

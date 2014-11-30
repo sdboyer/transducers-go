@@ -97,8 +97,9 @@ func Example_transduce() {
 
 func Example_connectedProcesses() {
 	// The Escape transducer allows values in a transduction process to "escape"
-	// partway through processing into a channel - which can be used to feed another
-	// transduction process.
+	// partway through processing into a channel. That channel can be used to
+	// feed another transduction process, creating a well-defined cascade of
+	// transduction processes.
 
 	c := make(chan interface{}, 0)
 	input := make(chan interface{}, 0)

@@ -35,6 +35,7 @@ func (vs *ValueStream) ToSlice() (into []interface{}) {
 	return into
 }
 
+// TODO having both of these is wrong...and buggy
 func ToSlice(vs ValueStream) (into []interface{}) {
 	for value, done := vs(); !done; value, done = vs() {
 		if ivs, ok := value.(ValueStream); ok {

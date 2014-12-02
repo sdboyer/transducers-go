@@ -54,7 +54,7 @@ func Example_clojureParity() {
 	// processors. I didn't replicate sequence because, as best I can figure,
 	// it's redundant with Eduction in a golang context.
 	// I didn't replicate into because it's a use pattern that is awkward with
-	// strict typing, and is readily accomplished via Transduce.
+	// static typing, and is readily accomplished via Transduce.
 
 	// reduce immediately, appending the results of transduction into an int slice.
 	fmt.Println(Transduce(data, Append(), xform...))

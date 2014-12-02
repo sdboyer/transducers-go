@@ -37,12 +37,4 @@ Transducers have some jargon. Here's an attempt to cut it down:
 
 ## Transducers, generics, and the type system
 
-Generics: the question the just keeps coming up. Developing this library has evolved my perspective a bit.
-
-I've worked on a [couple](https://github.com/fatih/set) [libraries](https://github.com/sdboyer/gogl) that traffic in generics, and looked at a lot more. The most practical problem, IMO, is the cost/benefit of having to constantly type-assert values as they emerge from your generic datastructures. The secondary problem is a correctness one - that *all* the elements in a given datastructure would be of the same type. This guarantee is lost when relying on `interface{}`.
-
-Both of these problems would be solved with [parametric polymorphism](http://en.wikipedia.org/wiki/Parametric_polymorphism); however, it's my understanding that the Go authors feel that the benefits of doing this are minimal, given that the ease of either performing the check yourself with a type assertion, or just making a type-specific version of the library. In general, I'm inclined to agree.
-
-With transducers, however, fully and correctly typing transduction processes is about much more than just parametric polymorphism. Frankly, I don't understand all the gymnastics a type system would have to perform to bring type safety to a system like transducers; I know that an algebraic type system would help with some problems, some noise about [rank-2 polymorphic types](http://conscientiousprogrammer.com/blog/2014/08/07/understanding-cloure-transducers-through-types/), and then some more stuff [here](http://blog.podsnap.com/ducers2.html).
-
-In writing this lib, I've observed that whereas problems that are solveable with parametric polymorphism often don't feel "worth it" in Go, it gets a lot more appealing when the use of `interface{}` is eliding a more complex type situation. Transducers provide a way of subdividing and organizing whole segments of an application - maybe that's worth a bit of the "[run time type safety](http://blog.burntsushi.net/type-parametric-functions-golang)" mentality.
+See [#1](https://github.com/sdboyer/transducers-go/issues/1).

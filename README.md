@@ -4,9 +4,9 @@ This is an implementation of transducers, a concept [from Clojure](http://clojur
 
 Transducers can be tricky to understand with just an abstract description, but here it is:
 
-> "Transducers are a means of building composable, reusable algorithmic transformations."
+> Transducers are a means of building composable, reusable algorithmic transformations.
 
-Transducers were introduced in Clojure for a reason akin to the reason that `range` exists in Go: because they wanted one way of writing element-wise operations on channels *and* other collection structures (though that's just the tip of the iceberg).
+Transducers were introduced in Clojure for a sorta-similar reason that `range` exists in Go: they wanted one way of writing element-wise operations on channels *and* other collection structures (though that's just the tip of the iceberg).
 
 I'm honestly not sure if I these are a good idea for Go or not. I've written this library as an exploratory experiment in their utility/applicability to Go, and would love feedback on transducers' utility for Go.
 

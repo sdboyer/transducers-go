@@ -22,24 +22,10 @@ func (vs ValueStream) Each(f func(interface{})) {
 //
 // Will consume until the stream says its done - unsafe for infinite streams,
 // and will block if the stream is based on a blocking datasource (e.g., chan).
-func (vs *ValueStream) ToSlice() (into []interface{}) {
-	dup := Dup(vs)
-	for value, done := dup(); !done; value, done = dup() {
-		if ivs, ok := value.(ValueStream); ok {
-			into = append(into, (&ivs).ToSlice())
-		} else {
-			into = append(into, value)
-		}
-	}
-
-	return into
-}
-
-// TODO having both of these is wrong...and buggy
 func ToSlice(vs ValueStream) (into []interface{}) {
 	for value, done := vs(); !done; value, done = vs() {
 		if ivs, ok := value.(ValueStream); ok {
-			value = Dup(&ivs)
+			ivs, value = ivs.Split()
 			into = append(into, ToSlice(ivs))
 		} else {
 			into = append(into, value)
@@ -49,8 +35,18 @@ func ToSlice(vs ValueStream) (into []interface{}) {
 	return into
 }
 
+// Recursively create a slice from a duplicate (Split) of the given stream.
+//
+// Will consume until the stream says its done - unsafe for infinite streams,
+// and will block if the stream is based on a blocking datasource (e.g., chan).
+//
+// The slice is read out of the duplicate, and the passed value is repointed to
+// an unconsumed stream, so it is safe for convenient use patterns. See example.
 func DupIntoSlice(vs *ValueStream) (into []interface{}) {
-	dup := Dup(vs)
+	var dup ValueStream
+	// write through pointer to replace original val with first split
+	*vs, dup = vs.Split() // write through pointer to replace
+
 	for value, done := dup(); !done; value, done = dup() {
 		if ivs, ok := value.(ValueStream); ok {
 			into = append(into, DupIntoSlice(&ivs))
@@ -62,63 +58,62 @@ func DupIntoSlice(vs *ValueStream) (into []interface{}) {
 	return into
 }
 
-// Duplicates a ValueStream by moving the pointer to the original stream
-// to an internal var, passing calls from either dup'd stream to the
-// origin stream, and holding values provided from origin until both dup'd
-// streams have consumed the value.
+// Splits a value stream into two identical streams that can both be
+// consumed independently.
+//
+// Note that calls to the original stream will still work - and any values
+// consumed that way will be missed by the split streams. Be very careful!
 //
 // TODO I think this might leak
 // TODO figure out if there's a nifty way to make this threadsafe
-func Dup(vs *ValueStream) ValueStream {
-	var src ValueStream = *vs
+func (vs ValueStream) Split() (ValueStream, ValueStream) {
+	var src ValueStream = vs
 	var f1i, f2i int
 	var held []interface{}
 
-	*vs = func() (value interface{}, done bool) {
-		if f1i >= f2i {
-			// this stream is ahead, pull from the source
-			value, done = src()
-			if !done {
-				// recursively dup streams
-				if vs, ok := value.(ValueStream); ok {
-					value = Dup(&vs)
-					held = append(held, vs)
-				} else {
-					held = append(held, value)
-				}
-			}
-		} else {
-			value, held = held[0], held[1:]
-		}
-
-		if !done {
-			f1i++
-		}
-		return
-	}
-
 	return func() (value interface{}, done bool) {
-		if f2i >= f1i {
-			// this stream is ahead, pull from the source
-			value, done = src()
-			if !done {
-				// recursively dup streams
-				if vs, ok := value.(ValueStream); ok {
-					value = Dup(&vs)
-					held = append(held, vs)
-				} else {
-					held = append(held, value)
+			if f1i >= f2i {
+				// this stream is ahead, pull from the source
+				value, done = src()
+				if !done {
+					// recursively dup streams
+					if vs, ok := value.(ValueStream); ok {
+						vs, value = vs.Split()
+						held = append(held, vs)
+					} else {
+						held = append(held, value)
+					}
 				}
+			} else {
+				value, held = held[0], held[1:]
 			}
-		} else {
-			value, held = held[0], held[1:]
-		}
 
-		if !done {
-			f2i++
+			if !done {
+				f1i++
+			}
+			return
+		}, func() (value interface{}, done bool) {
+			if f2i >= f1i {
+				// this stream is ahead, pull from the source
+				value, done = src()
+				if !done {
+					// recursively dup streams
+					if vs, ok := value.(ValueStream); ok {
+						vs, value = vs.Split()
+						held = append(held, vs)
+					} else {
+						held = append(held, value)
+					}
+				}
+			} else {
+				value, held = held[0], held[1:]
+			}
+
+			if !done {
+				f2i++
+			}
+			return
 		}
-		return
-	}
 }
 
 func StreamIntoChan(vs ValueStream, c chan<- interface{}) {

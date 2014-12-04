@@ -84,7 +84,7 @@ func (r filter) Reduce(accum interface{}, value interface{}) (interface{}, bool)
 	fml("FILTER: accum is", accum, "value is", value)
 	var check bool
 	if vs, ok := value.(ValueStream); ok {
-		value = Dup(&vs)
+		vs, value = vs.Split()
 		check = r.f(vs)
 	} else {
 		check = r.f(value)
@@ -283,7 +283,7 @@ func (t *chunkBy) Reduce(accum interface{}, value interface{}) (interface{}, boo
 	fml("CHUNKBY: accum val:", accum, "incoming value", value, "coll contents:", t.coll)
 	var chunkval interface{}
 	if vs, ok := value.(ValueStream); ok {
-		value = Dup(&vs)
+		vs, value = vs.Split()
 		chunkval = t.chunker(vs)
 	} else {
 		chunkval = t.chunker(value)
@@ -552,7 +552,7 @@ type escape struct {
 func (r escape) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
 	var check bool
 	if vs, ok := value.(ValueStream); ok {
-		value = Dup(&vs)
+		vs, value = vs.Split()
 		check = r.f(vs)
 	} else {
 		check = r.f(value)

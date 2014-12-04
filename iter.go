@@ -23,7 +23,7 @@ func (vs ValueStream) Each(f func(interface{})) {
 // Will consume until the stream says its done - unsafe for infinite streams,
 // and will block if the stream is based on a blocking datasource (e.g., chan).
 func (vs *ValueStream) ToSlice() (into []interface{}) {
-	dup := vs.Dup()
+	dup := Dup(vs)
 	for value, done := dup(); !done; value, done = dup() {
 		if ivs, ok := value.(ValueStream); ok {
 			into = append(into, (&ivs).ToSlice())
@@ -39,7 +39,7 @@ func (vs *ValueStream) ToSlice() (into []interface{}) {
 func ToSlice(vs ValueStream) (into []interface{}) {
 	for value, done := vs(); !done; value, done = vs() {
 		if ivs, ok := value.(ValueStream); ok {
-			value = (&ivs).Dup()
+			value = Dup(&ivs)
 			into = append(into, ToSlice(ivs))
 		} else {
 			into = append(into, value)
@@ -50,7 +50,7 @@ func ToSlice(vs ValueStream) (into []interface{}) {
 }
 
 func DupIntoSlice(vs *ValueStream) (into []interface{}) {
-	dup := vs.Dup()
+	dup := Dup(vs)
 	for value, done := dup(); !done; value, done = dup() {
 		if ivs, ok := value.(ValueStream); ok {
 			into = append(into, DupIntoSlice(&ivs))
@@ -69,7 +69,7 @@ func DupIntoSlice(vs *ValueStream) (into []interface{}) {
 //
 // TODO I think this might leak
 // TODO figure out if there's a nifty way to make this threadsafe
-func (vs *ValueStream) Dup() ValueStream {
+func Dup(vs *ValueStream) ValueStream {
 	var src ValueStream = *vs
 	var f1i, f2i int
 	var held []interface{}
@@ -81,7 +81,7 @@ func (vs *ValueStream) Dup() ValueStream {
 			if !done {
 				// recursively dup streams
 				if vs, ok := value.(ValueStream); ok {
-					value = (&vs).Dup()
+					value = Dup(&vs)
 					held = append(held, vs)
 				} else {
 					held = append(held, value)
@@ -104,7 +104,7 @@ func (vs *ValueStream) Dup() ValueStream {
 			if !done {
 				// recursively dup streams
 				if vs, ok := value.(ValueStream); ok {
-					value = (&vs).Dup()
+					value = Dup(&vs)
 					held = append(held, vs)
 				} else {
 					held = append(held, value)

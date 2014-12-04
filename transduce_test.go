@@ -286,7 +286,7 @@ func TestStreamDup(t *testing.T) {
 	var s interface{} = Range(3)
 	stream := s.(ValueStream)
 	fmt.Printf("iface orig: %v, stream orig: %v\n", s, stream)
-	dupd := (&stream).Dup()
+	dupd := Dup(&stream)
 	fmt.Printf("iface after dup: %v, stream after dup: %v, dup: %v\n", s, stream, dupd)
 	s = dupd
 	fmt.Printf("iface after assign: %v, stream after dup: %v, dup: %v\n", s, stream, dupd)
@@ -323,7 +323,7 @@ func TestStreamDup(t *testing.T) {
 	}.AsStream()
 	fmt.Println(rstream)
 
-	dup := (&rstream).Dup()
+	dup := Dup(&rstream)
 	r1 := ToSlice(rstream)
 	fmt.Println(r1)
 	if fmt.Sprintf("%v", r1) != fmt.Sprintf("%v", base) {

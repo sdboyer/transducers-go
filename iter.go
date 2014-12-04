@@ -182,7 +182,7 @@ func ToStream(collection interface{}) ValueStream {
 
 	switch c := collection.(type) {
 	case []int:
-		return iteratorToValueStream(&IntSliceIterator{slice: c})
+		return iteratorToValueStream(&intSliceIterator{slice: c})
 	case []interface{}:
 		return ValueSlice(c).AsStream()
 	case ValueStream:
@@ -214,52 +214,52 @@ type Iterator interface {
 	Done()
 }
 
-type IntSliceIterator struct {
+type intSliceIterator struct {
 	slice []int
 	pos   int
 }
 
-func (i *IntSliceIterator) Current() interface{} {
+func (i *intSliceIterator) Current() interface{} {
 	return i.slice[i.pos]
 }
 
-func (i *IntSliceIterator) Next() {
+func (i *intSliceIterator) Next() {
 	// TODO atomicity
 	i.pos++
 }
 
-func (i *IntSliceIterator) Valid() (valid bool) {
+func (i *intSliceIterator) Valid() (valid bool) {
 	return i.pos < len(i.slice)
 }
 
-func (i *IntSliceIterator) Done() {
+func (i *intSliceIterator) Done() {
 
 }
 
 type ValueSlice []interface{}
 
 func (s ValueSlice) AsStream() ValueStream {
-	return iteratorToValueStream(&InterfaceSliceIterator{slice: s})
+	return iteratorToValueStream(&interfaceSliceIterator{slice: s})
 }
 
-type InterfaceSliceIterator struct {
+type interfaceSliceIterator struct {
 	slice []interface{}
 	pos   int
 }
 
-func (i *InterfaceSliceIterator) Current() interface{} {
+func (i *interfaceSliceIterator) Current() interface{} {
 	return i.slice[i.pos]
 }
 
-func (i *InterfaceSliceIterator) Next() {
+func (i *interfaceSliceIterator) Next() {
 	// TODO atomicity
 	i.pos++
 }
 
-func (i *InterfaceSliceIterator) Valid() (valid bool) {
+func (i *interfaceSliceIterator) Valid() (valid bool) {
 	return i.pos < len(i.slice)
 }
 
-func (i *InterfaceSliceIterator) Done() {
+func (i *interfaceSliceIterator) Done() {
 
 }

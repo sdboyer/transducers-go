@@ -39,7 +39,21 @@ func (vs *ValueStream) ToSlice() (into []interface{}) {
 func ToSlice(vs ValueStream) (into []interface{}) {
 	for value, done := vs(); !done; value, done = vs() {
 		if ivs, ok := value.(ValueStream); ok {
-			into = append(into, (&ivs).ToSlice())
+			value = (&ivs).Dup()
+			into = append(into, ToSlice(ivs))
+		} else {
+			into = append(into, value)
+		}
+	}
+
+	return into
+}
+
+func DupIntoSlice(vs *ValueStream) (into []interface{}) {
+	dup := vs.Dup()
+	for value, done := dup(); !done; value, done = dup() {
+		if ivs, ok := value.(ValueStream); ok {
+			into = append(into, DupIntoSlice(&ivs))
 		} else {
 			into = append(into, value)
 		}
@@ -53,9 +67,7 @@ func ToSlice(vs ValueStream) (into []interface{}) {
 // origin stream, and holding values provided from origin until both dup'd
 // streams have consumed the value.
 //
-// Clean up after yourself with this one - it could be leaky. Also, very much
-// not threadsafe.
-//
+// TODO I think this might leak
 // TODO figure out if there's a nifty way to make this threadsafe
 func (vs *ValueStream) Dup() ValueStream {
 	var src ValueStream = *vs
@@ -67,7 +79,13 @@ func (vs *ValueStream) Dup() ValueStream {
 			// this stream is ahead, pull from the source
 			value, done = src()
 			if !done {
-				held = append(held, value)
+				// recursively dup streams
+				if vs, ok := value.(ValueStream); ok {
+					value = (&vs).Dup()
+					held = append(held, vs)
+				} else {
+					held = append(held, value)
+				}
 			}
 		} else {
 			value, held = held[0], held[1:]
@@ -84,7 +102,13 @@ func (vs *ValueStream) Dup() ValueStream {
 			// this stream is ahead, pull from the source
 			value, done = src()
 			if !done {
-				held = append(held, value)
+				// recursively dup streams
+				if vs, ok := value.(ValueStream); ok {
+					value = (&vs).Dup()
+					held = append(held, vs)
+				} else {
+					held = append(held, value)
+				}
 			}
 		} else {
 			value, held = held[0], held[1:]

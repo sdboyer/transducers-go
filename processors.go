@@ -112,8 +112,8 @@ func Eduction(coll interface{}, tlist ...Transducer) ValueStream {
 //
 // The second parameter determines the buffering of the returned channel (it is
 // passed directly to the make() call).
-func Go(c <-chan interface{}, retbuf int, tlist ...Transducer) <-chan interface{} {
-	out := make(chan interface{}, retbuf)
+func Go(c <-chan interface{}, retcap int, tlist ...Transducer) <-chan interface{} {
+	out := make(chan interface{}, retcap)
 	pipe := CreatePipeline(chanReducer{c: out}, tlist...)
 
 	var accum struct{} // accum is unused in this mode

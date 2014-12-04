@@ -283,8 +283,13 @@ func TestEscape(t *testing.T) {
 }
 
 func TestStreamDup(t *testing.T) {
-	stream := Range(3)
+	var s interface{} = Range(3)
+	stream := s.(ValueStream)
+	fmt.Printf("iface orig: %v, stream orig: %v\n", s, stream)
 	dupd := (&stream).Dup()
+	fmt.Printf("iface after dup: %v, stream after dup: %v, dup: %v\n", s, stream, dupd)
+	s = dupd
+	fmt.Printf("iface after assign: %v, stream after dup: %v, dup: %v\n", s, stream, dupd)
 
 	var res1, res2 []int
 	stream.Each(func(value interface{}) {
@@ -297,6 +302,37 @@ func TestStreamDup(t *testing.T) {
 
 	intSliceEquals([]int{0, 1, 2}, res1, t)
 	intSliceEquals([]int{0, 1, 2}, res2, t)
+
+	// test recursive
+	base := ValueSlice{
+		[]int{0, 1},
+		ValueSlice{
+			[]int{2, 3},
+			[]int{4, 5, 6},
+		},
+		[]int{7, 8},
+	}
+	fmt.Println(base)
+	rstream := ValueSlice{
+		ToStream([]int{0, 1}),
+		ValueSlice{
+			ToStream([]int{2, 3}),
+			ToStream([]int{4, 5, 6}),
+		}.AsStream(),
+		ToStream([]int{7, 8}),
+	}.AsStream()
+	fmt.Println(rstream)
+
+	dup := (&rstream).Dup()
+	r1 := ToSlice(rstream)
+	fmt.Println(r1)
+	if fmt.Sprintf("%v", r1) != fmt.Sprintf("%v", base) {
+		t.Error("First stream not expected value, got", r1)
+	}
+	r2 := ToSlice(dup)
+	if fmt.Sprintf("%v", r2) != fmt.Sprintf("%v", base) {
+		t.Error("Second stream not expected value, got", r2)
+	}
 }
 
 func TestEduction(t *testing.T) {

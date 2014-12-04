@@ -5,9 +5,6 @@ package transduce
 // The first parameter is a logging function - e.g., fmt.Printf - into which
 // the logging transducers will send their output through this function.
 //
-// Note that a '!' at the end of a value set indicates that the logging transducer
-// received a termination signal.
-//
 // NOTE: this will block, and/or exhaust memory, on infinite streams.
 func AttachLoggers(logger func(string, ...interface{}) (int, error), tds ...Transducer) []Transducer {
 	tlfunc := func(r ReduceStep) ReduceStep {
@@ -30,7 +27,12 @@ type topLogger struct {
 }
 
 func (r *topLogger) Complete(accum interface{}) interface{} {
-	r.logger("SRC -> %v\n\t%T", r.values, r.next)
+	if r.term {
+		r.logger("SRC -> %v |TERM|\n\t%T", r.values, r.next)
+	} else {
+		r.logger("SRC -> %v\n\t%T", r.values, r.next)
+	}
+	//r.logger("SRC -> %v\n\t%T", r.values, r.next)
 	accum = r.next.Complete(accum)
 	r.logger("\nEND\n")
 
@@ -48,6 +50,7 @@ type reduceLogger struct {
 	values []interface{}
 	logger func(string, ...interface{}) (int, error)
 	next   ReduceStep
+	term   bool
 }
 
 func (r *reduceLogger) Init() interface{} {
@@ -55,27 +58,23 @@ func (r *reduceLogger) Init() interface{} {
 }
 
 func (r *reduceLogger) Complete(accum interface{}) interface{} {
-	r.logger(" -> %v\n\t%T", r.values, r.next)
+	if r.term {
+		r.logger(" -> %v |TERM|\n\t%T", r.values, r.next)
+	} else {
+		r.logger(" -> %v\n\t%T", r.values, r.next)
+	}
 	return r.next.Complete(accum)
 }
 
 func (r *reduceLogger) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
 	// if the transducer produces a ValueStream, dup and dump it. (so, already not infinite-safe)
 	if vs, ok := value.(ValueStream); ok {
-		inner := make([]interface{}, 0)
-		value = (&vs).Dup()
-		vs.Each(func(v interface{}) {
-			inner = append(inner, v)
-		})
-		r.values = append(r.values, inner)
+		r.values = append(r.values, DupIntoSlice(&vs))
+		value = vs
 	} else {
 		r.values = append(r.values, value)
 	}
 
-	var term bool
-	accum, term = r.next.Reduce(accum, value)
-	if term {
-		r.values = append(r.values, "!")
-	}
-	return accum, term
+	accum, r.term = r.next.Reduce(accum, value)
+	return accum, r.term
 }

@@ -46,14 +46,10 @@ func Example_clojureParity() {
 	// An []interface{} slice (containing only ints) with vals [0 0 1 1 2 2 ... 17 17]
 	data := ToSlice(Interleave(Range(18), Range(20)))
 
-	// If this is hard to visualize, you can add logging transducers that will show the
-	// set of values at each stage of transduction:
-	// xform = AttachLoggers(fmt.Printf, xform...)
-
 	// NB: the original clojure gists also have (sequence ...) and (into []...)
-	// processors. I didn't replicate sequence because, as best I can figure,
-	// it's redundant with Eduction in a golang context.
-	// I didn't replicate into because it's a use pattern that is awkward with
+	// processors. I didn't replicate `sequence` because, as best I can figure,
+	// it's redundant with Eduction in the context I've created (no seqs).
+	// I didn't replicate `into` because it's a use pattern that is awkward with
 	// static typing, and is readily accomplished via Transduce.
 
 	// reduce immediately, appending the results of transduction into an int slice.
@@ -85,7 +81,73 @@ func Example_clojureParity() {
 	// 10
 }
 
-func Example_transduce() {
+func Example_clojureParityLogged() {
+	// Each moving part can be hard to follow, so this is the same example but with
+	// where we wrap the transducer stack with loggers.
+	xform := AttachLoggers(fmt.Printf,
+		Map(Inc),
+		Filter(Even),
+		Dedupe(),
+		Mapcat(Range),
+		Chunk(3),
+		ChunkBy(func(value interface{}) interface{} {
+			return sum(value.(ValueStream)) > 7
+		}),
+		Mapcat(Flatten),
+		RandomSample(1.0),
+		TakeNth(1),
+		Keep(func(v interface{}) interface{} {
+			if v.(int)%2 != 0 {
+				return v.(int) * v.(int)
+			} else {
+				return nil
+			}
+		}),
+		KeepIndexed(func(i int, v interface{}) interface{} {
+			if i%2 == 0 {
+				return i * v.(int)
+			} else {
+				return nil
+			}
+		}),
+		Replace(map[interface{}]interface{}{2: "two", 6: "six", 18: "eighteen"}),
+		Take(11),
+		TakeWhile(func(v interface{}) bool {
+			return v != 300
+		}),
+		Drop(1),
+		DropWhile(IsString),
+		Remove(IsString),
+	)
+
+	data := ToSlice(Interleave(Range(18), Range(20)))
+	Transduce(data, Append(), xform...)
+
+	// Output:
+	// SRC -> [0 0 1 1 2 2 3 3 4 4 5 5 6 6 7 7 8 8 9 9 10 10 11 !]
+	// 	transduce.map_r -> [1 1 2 2 3 3 4 4 5 5 6 6 7 7 8 8 9 9 10 10 11 11 12 !]
+	// 	transduce.filter -> [2 2 4 4 6 6 8 8 10 10 12 !]
+	// 	*transduce.dedupe -> [2 4 6 8 10 12 !]
+	// 	transduce.mapcat -> [0 1 0 1 2 3 0 1 2 3 4 5 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 8 9 0 1 2 !]
+	// 	*transduce.chunk -> [[0 1 0] [1 2 3] [0 1 2] [3 4 5] [0 1 2] [3 4 5] [6 7 0] [1 2 3] [4 5 6] [7 8 9] [0 1 2] !]
+	// 	*transduce.chunkBy -> [[0x55040 0x55040 0x55040] [0x55040] [0x55040] [0x55040 0x55040] [0x55040] [0x55040 0x55040] !]
+	// 	transduce.mapcat -> [0 1 0 1 2 3 0 1 2 3 4 5 0 1 2 3 4 5 6 7 0 1 2 3 4 5 !]
+	// 	transduce.randomSample -> [0 1 0 1 2 3 0 1 2 3 4 5 0 1 2 3 4 5 6 7 0 1 2 3 4 5 !]
+	// 	transduce.takeNth -> [0 1 0 1 2 3 0 1 2 3 4 5 0 1 2 3 4 5 6 7 0 1 2 3 4 5 !]
+	// 	transduce.keep -> [1 1 9 1 9 25 1 9 25 49 1 9 25 !]
+	// 	*transduce.keepIndexed -> [0 18 36 6 200 10 300 !]
+	// 	transduce.replace -> [0 eighteen 36 six 200 10 300 !]
+	// 	*transduce.take -> [0 eighteen 36 six 200 10 300 !]
+	// 	transduce.takeWhile -> [0 eighteen 36 six 200 10]
+	// 	*transduce.drop -> [eighteen 36 six 200 10]
+	// 	*transduce.dropWhile -> [36 six 200 10]
+	// 	transduce.remove -> [36 200 10]
+	// 	transduce.append_bottom
+	// END
+
+}
+
+func ExampleTransduce() {
 	// Transducing does an immediate (non-lazy) application of the transduction
 	// stack to the incoming ValueStream.
 
@@ -95,7 +157,7 @@ func Example_transduce() {
 	// [2 4 6]
 }
 
-func Example_connectedProcesses() {
+func ExampleEscape() {
 	// The Escape transducer allows values in a transduction process to "escape"
 	// partway through processing into a channel. That channel can be used to
 	// feed another transduction process, creating a well-defined cascade of

@@ -42,14 +42,14 @@ func ToSlice(vs ValueStream) (into []interface{}) {
 //
 // The slice is read out of the duplicate, and the passed value is repointed to
 // an unconsumed stream, so it is safe for convenient use patterns. See example.
-func DupIntoSlice(vs *ValueStream) (into []interface{}) {
+func IntoSlice(vs *ValueStream) (into []interface{}) {
 	var dup ValueStream
 	// write through pointer to replace original val with first split
 	*vs, dup = vs.Split() // write through pointer to replace
 
 	for value, done := dup(); !done; value, done = dup() {
 		if ivs, ok := value.(ValueStream); ok {
-			into = append(into, DupIntoSlice(&ivs))
+			into = append(into, IntoSlice(&ivs))
 		} else {
 			into = append(into, value)
 		}

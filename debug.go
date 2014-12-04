@@ -69,7 +69,7 @@ func (r *reduceLogger) Complete(accum interface{}) interface{} {
 func (r *reduceLogger) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
 	// if the transducer produces a ValueStream, dup and dump it. (so, already not infinite-safe)
 	if vs, ok := value.(ValueStream); ok {
-		r.values = append(r.values, DupIntoSlice(&vs))
+		r.values = append(r.values, IntoSlice(&vs))
 		value = vs
 	} else {
 		r.values = append(r.values, value)

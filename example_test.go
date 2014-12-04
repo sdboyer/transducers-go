@@ -156,6 +156,26 @@ func ExampleTransduce() {
 	// [2 4 6]
 }
 
+func ExampleIntoSlice() {
+	// ValueStreams are forward-only iterators, so reading them into a slice will
+	// exhaust the iterator. Not great if you have to pass the stream along.
+	stream := Range(3)
+	fmt.Println(ToSlice(stream)) // [0 1 2]
+	fmt.Println(ToSlice(stream)) // [], because the first call exhausted the stream
+
+	// IntoSlice() will read a dup/split of the stream, then use some pointer
+	// trickery to update local variable in your calling scope:
+	stream = Range(3)
+	fmt.Println(IntoSlice(&stream)) // [0 1 2]
+	fmt.Println(IntoSlice(&stream)) // [0 1 2]
+
+	// Output:
+	// [0 1 2]
+	// []
+	// [0 1 2]
+	// [0 1 2]
+}
+
 func ExampleEscape() {
 	// The Escape transducer allows values in a transduction process to "escape"
 	// partway through processing into a channel. That channel can be used to

@@ -35,7 +35,7 @@ func ToSlice(vs ValueStream) (into []interface{}) {
 	return into
 }
 
-// Recursively create a slice from a duplicate (Split) of the given stream.
+// Recursively create a slice from a duplicate (Split()) of the given stream.
 //
 // Will consume until the stream says its done - unsafe for infinite streams,
 // and will block if the stream is based on a blocking datasource (e.g., chan).

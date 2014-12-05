@@ -10,16 +10,16 @@ func fml(v ...interface{}) {
 	}
 }
 
-type reducerBase struct {
+type reduceStepBase struct {
 	next ReduceStep
 }
 
-func (r reducerBase) Complete(accum interface{}) interface{} {
+func (r reduceStepBase) Complete(accum interface{}) interface{} {
 	// Pure functions inherently can't have any completion work, so flow through
 	return r.next.Complete(accum)
 }
 
-func (r reducerBase) Init() interface{} {
+func (r reduceStepBase) Init() interface{} {
 	return r.next.Init()
 }
 

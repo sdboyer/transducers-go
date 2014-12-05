@@ -6,7 +6,7 @@ This is an implementation of transducers, a concept from [Clojure](http://clojur
 
 Transducers can be tricky to understand with just an abstract description, but here it is:
 
-> Transducers are a means of building composable, reusable transformation algorithms.
+> Transducers are a composable way to build reusable algorithmic transformations.
 
 Transducers were introduced in Clojure for a sorta-similar reason that `range` exists in Go: because they wanted one way of writing element-wise operations on channels *and* other collection structures (though that's just the tip of the iceberg).
 

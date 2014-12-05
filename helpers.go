@@ -23,29 +23,44 @@ func (r reducerBase) Init() interface{} {
 	return r.next.Init()
 }
 
-type bareReducer struct {
+type reduceStepHelper struct {
 	R func(accum interface{}, value interface{}) (interface{}, bool)
 	C func(accum interface{}) interface{}
 	I func() interface{}
 }
 
-func (r bareReducer) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+func (r reduceStepHelper) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
 	return r.R(accum, value)
 }
 
-func (r bareReducer) Complete(accum interface{}) interface{} {
+func (r reduceStepHelper) Complete(accum interface{}) interface{} {
 	return r.C(accum)
 }
 
-func (r bareReducer) Init() interface{} {
+func (r reduceStepHelper) Init() interface{} {
 	return r.I()
 }
 
-func BareReducer() bareReducer {
-	return bareReducer{
-		R: func(accum interface{}, value interface{}) (interface{}, bool) {
+// Creates a helper struct for defining a ReduceStep on the fly.
+//
+// This is mostly useful for creating a bottom reducer with minimal fanfare.
+//
+// This returns an instance of bareReducer, which is a struct containing three
+// function pointers, one for each of the three methods of ReduceStep - R for
+// Reduce, C for Complete, I for Init. The struct implements ReduceStep
+// by simply passing method calls along to the contained function pointers.
+//
+// This makes it easier to create ReduceSteps on the fly. The first argument is a
+// reducer - if you pass nil, it'll create a no-op reducer for you. If you want to
+// overwrite the other two, do it on the returned struct.
+func CreateStep(r Reducer) reduceStepHelper {
+	if r == nil {
+		r = func(accum interface{}, value interface{}) (interface{}, bool) {
 			return accum, false
-		},
+		}
+	}
+	return reduceStepHelper{
+		R: r,
 		C: func(accum interface{}) interface{} {
 			return accum
 		},

@@ -90,8 +90,6 @@ I figure there's pros and cons to something like this. Makes sense to put em up 
 * While the loss of type assurances hurts - a lot - the spec for transducer behavior is clear enough that it's probably feasible to aim at "correctness" via exhaustive black-box tests. (hah)
 * And about types - I found a little kernel of something useful when looking beyond parametric polymorphism - [more here](https://github.com/sdboyer/go-transducers/issues/1).
 
-It's also been pointed out to me that these look a bit like [Google's Dataflow](http://googlecloudplatform.blogspot.com/2014/06/sneak-peek-google-cloud-dataflow-a-cloud-native-data-processing-service.html).
-
 ## Glossary
 
 Transducers have some jargon. Here's an attempt to cut it down. These go more or less in order.

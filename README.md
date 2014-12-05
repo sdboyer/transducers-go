@@ -1,6 +1,6 @@
 # Transducers for Go
 
-[![Build Status](https://travis-ci.org/sdboyer/go-transducers.svg?branch=master)](https://travis-ci.org/sdboyer/transducers-go)
+[![Build Status](https://travis-ci.org/sdboyer/go-transducers.svg?branch=master)](https://travis-ci.org/sdboyer/go-transducers)
 
 This is an implementation of transducers, a concept from [Clojure](http://clojure.org), for Go.
 
@@ -100,7 +100,7 @@ Transducers have some jargon. Here's an attempt to cut it down. These go more or
 * **Reduce Step:** A [function](http://godoc.org/github.com/sdboyer/go-transducers#ReduceStep)/method with a reduce-like signature: `(accum, value) return`
 * **Reducer:** A [set of three](http://godoc.org/github.com/sdboyer/go-transducers#Reducer) functions - the Reduce Step, plus Complete and Init methods.
 * **Transducer:** A function that *transforms* a *reducing* function. They [take a reducing func and return another](http://godoc.org/github.com/sdboyer/go-transducers#Transducer).
-* **Predicate:** Some transducers - for example, [Map](http://godoc.org/github.com/sdboyer/go-transducers#Map) and [Filter](http://godoc.org/github.com/sdboyer/transducers-go#Filter) - take a function to do their work. These injected functions are referred to as predicates.
+* **Predicate:** Some transducers - for example, [Map](http://godoc.org/github.com/sdboyer/go-transducers#Map) and [Filter](http://godoc.org/github.com/sdboyer/go-transducers#Filter) - take a function to do their work. These injected functions are referred to as predicates.
 * **Transducer stack:** In short: `[]Transducer`. A stack is stateless (it's just logic) and can be reused in as many processes as desired.
 * **Bottom reducer:** The reducer that a stack of transducers will operate on.
 * **Processor:** Processors take (at minimum) some kind of collection and a transducer stack, compose a transducer pipeline from the stack, and apply it across the elements of the collection.

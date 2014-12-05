@@ -69,6 +69,8 @@ func (r map_r) Reduce(accum interface{}, value interface{}) (interface{}, bool) 
 	return r.next.Reduce(accum, r.f(value))
 }
 
+// Map calls its predicate once for each value coming through, passing the
+// result along to the next step.
 func Map(f Mapper) Transducer {
 	return func(r ReduceStep) ReduceStep {
 		return map_r{reduceStepBase{r}, f}
@@ -97,6 +99,9 @@ func (r filter) Reduce(accum interface{}, value interface{}) (interface{}, bool)
 	}
 }
 
+// Returns a Filter transducer. Filters call their predicate function for
+// each incoming value, dropping the value if the predicate returns false
+// and passing it along if it returns true.
 func Filter(f Filterer) Transducer {
 	return func(r ReduceStep) ReduceStep {
 		return filter{reduceStepBase{r}, f}
@@ -164,9 +169,8 @@ func (r mapcat) Reduce(accum interface{}, value interface{}) (interface{}, bool)
 	return accum, terminate
 }
 
-// Mapcat first runs an exploder, then 'concats' results by
-// passing each individual value along to the next transducer
-// in the stack.
+// Mapcat first runs an exploder, then 'concats' results by passing each
+// individual value along to the next transducer in the pipeline.
 func Mapcat(f Exploder) Transducer {
 	return func(r ReduceStep) ReduceStep {
 		return mapcat{reduceStepBase{r}, f}
@@ -195,7 +199,7 @@ func (r *dedupe) Reduce(accum interface{}, value interface{}) (interface{}, bool
 // Dedupe keeps track of values that have passed through it during this
 // transduction process and drops any duplicates.
 //
-// Simple equality (==) is used for comparison - will blow up on non-hashable
+// Simple equality (==) is used for comparison. That will panic on non-hashable
 // datastructures (maps, slices, channels)!
 func Dedupe() Transducer {
 	return func(r ReduceStep) ReduceStep {

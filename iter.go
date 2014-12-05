@@ -1,8 +1,17 @@
 package transduce
 
-// The lowest-possible-denominator iteration concept. Kinda terrible.
+// ValueStreams are the core abstraction that facilitate value-oriented
+// communication in a transduction pipeline. Unfortunately, various typing
+// issues preclude the use of slices directly.
 //
-// TODO quite possible that this whole concept should be redone with channels
+// They are a lowest-possible-denominator iterator concept: forward-only,
+// non-seeking, non-rewinding. They're kinda terrible. But they're also
+// very simple: call the function. If the second val is true, the iterator
+// is exhausted. If not, the first return value is the next value.
+//
+// TODO At minimum, a proper implementation would probably need to include a
+// adding a parameter that allows the caller to indicate they no longer
+// need the stream. (Not quite a 'close', but possibly interpreted that way)
 type ValueStream func() (value interface{}, done bool)
 
 // Convenience function that receives from the stream and passes the
@@ -169,6 +178,8 @@ func flattenValueStream(vs ValueStream) ValueStream {
 	return f
 }
 
+// If something has a special way of representing itself a stream, it should
+// implement this method.
 type Streamable interface {
 	AsStream() ValueStream
 }
@@ -207,6 +218,45 @@ func iteratorToValueStream(i Iterator) func() (value interface{}, done bool) {
 	}
 }
 
+// Interleaves two streams together, getting a value from the first stream,
+// then a value from the second stream.
+//
+// Values from both streams are collected at the same time, and if either
+// input is exhausted, the interleaved stream terminates immediately, even if
+// the other stream does have a value available.
+func Interleave(s1 ValueStream, s2 ValueStream) ValueStream {
+	var done bool
+	var v1, v2 interface{}
+	var index int
+
+	return func() (interface{}, bool) {
+		if done {
+			return nil, done
+		}
+
+		if index%2 == 0 {
+			// check both streams at once - if either is exhausted, stop
+			v1, done = s1()
+			if !done {
+				v2, done = s2()
+			}
+			if done {
+				return nil, done
+			}
+
+			index++
+			return v1, false
+		} else {
+			index++
+			return v2, false
+		}
+
+	}
+}
+
+// Simple iterator interface. Mostly used internally to handle slices.
+//
+// TODO Done() isn't used at all. also kinda terrible in general.
 type Iterator interface {
 	Current() (value interface{})
 	Next()

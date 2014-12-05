@@ -28,21 +28,24 @@ func sum(vs ValueStream) (total int) {
 	return
 }
 
+// Mapper: asserts the value is a ValueStream, then sums all contained
+// values (asserts that they are ints).
 func Sum(value interface{}) interface{} {
 	return sum(value.(ValueStream))
 }
 
+// Filterer: returns true if dynamic type of the value is string
 func IsString(v interface{}) bool {
 	_, ok := v.(string)
 	return ok
 }
 
-// Basic Mapper function (increments by 1)
+// Mapper: asserts value to int, increemnts by 1
 func Inc(value interface{}) interface{} {
 	return value.(int) + 1
 }
 
-// Basic Filterer function (true if even)
+// Filterer: asserts value to int, returns true if even.
 func Even(value interface{}) bool {
 	return value.(int)%2 == 0
 }
@@ -84,38 +87,8 @@ func Flatten(value interface{}) ValueStream {
 	}
 }
 
-// Wraps t_range into a ValueStream
+// Exploder: Given an int, returns a ValueStream of ints in the range [0, n).
 func Range(limit interface{}) ValueStream {
 	// lazy and inefficient to use MakeReduce here, do it directly
 	return ToStream(t_range(limit.(int)))
-}
-
-func Interleave(s1 ValueStream, s2 ValueStream) ValueStream {
-	var done bool
-	var v1, v2 interface{}
-	var index int
-
-	return func() (interface{}, bool) {
-		if done {
-			return nil, done
-		}
-
-		if index%2 == 0 {
-			// check both streams at once - if either is exhausted, stop
-			v1, done = s1()
-			if !done {
-				v2, done = s2()
-			}
-			if done {
-				return nil, done
-			}
-
-			index++
-			return v1, false
-		} else {
-			index++
-			return v2, false
-		}
-
-	}
 }

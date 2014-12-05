@@ -3,10 +3,13 @@ package transduce
 import "fmt"
 
 func Example_clojureParity() {
-	// mirrors Rich Hickey's original "transducerfun.clj" gist:
+	// Mirrors Rich Hickey's original "transducerfun.clj" gist:
 	//  https://gist.github.com/richhickey/b5aefa622180681e1c81
-	// note that that syntax is out of date and will not run, but this does:
+	// Note that that syntax is out of date and will not run, but this does:
 	//  https://gist.github.com/sdboyer/9fca652f492257f35a41
+	//
+	// Note also that this can be hard to follow - see the corollary example
+	// under AttachLoggers for step-by-step output.
 	xform := []Transducer{
 		Map(Inc),
 		Filter(Even),
@@ -81,9 +84,9 @@ func Example_clojureParity() {
 	// 10
 }
 
-func Example_clojureParityLogged() {
-	// Each moving part can be hard to follow, so this is the same example but with
-	// where we wrap the transducer stack with loggers.
+func ExampleAttachLoggers_clojureParity() {
+	// This is the same as the ClojureParity package example, but with loggers
+	// interleaved through each step.
 	xform := AttachLoggers(fmt.Printf,
 		Map(Inc),
 		Filter(Even),

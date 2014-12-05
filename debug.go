@@ -1,4 +1,4 @@
-package transduce
+package transducers
 
 // Interleaves logging transducers into the provided transducer stack.
 //

@@ -1,4 +1,4 @@
-package transduce
+package transducers
 
 // ValueStreams are the core abstraction that facilitate value-oriented
 // communication in a transduction pipeline. Unfortunately, various typing

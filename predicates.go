@@ -1,4 +1,4 @@
-package transduce
+package transducers
 
 // Transducer predicate function; used by Map, and others. Takes a value,
 // transforms it, and returns the result.

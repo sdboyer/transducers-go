@@ -1,4 +1,4 @@
-package transduce
+package transducers
 
 import "fmt"
 

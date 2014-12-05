@@ -1,6 +1,6 @@
 # Transducers for Go
 
-[![Build Status](https://travis-ci.org/sdboyer/transducers-go.svg?branch=master)](https://travis-ci.org/sdboyer/transducers-go)
+[![Build Status](https://travis-ci.org/sdboyer/go-transducers.svg?branch=master)](https://travis-ci.org/sdboyer/transducers-go)
 
 This is an implementation of transducers, a concept from [Clojure](http://clojure.org), for Go.
 
@@ -26,13 +26,13 @@ Here's some resources - mostly in Clojure, of course:
 
 ## Proof -> Pudding
 
-I'm calling this proof of concept "done" because [it can pretty much replicate](http://godoc.org/github.com/sdboyer/transducers-go#ex-package--ClojureParity) a [very thorough example](https://gist.github.com/sdboyer/9fca652f492257f35a41) Rich Hickey put out there.
+I'm calling this proof of concept "done" because [it can pretty much replicate](http://godoc.org/github.com/sdboyer/go-transducers#ex-package--ClojureParity) a [very thorough example](https://gist.github.com/sdboyer/9fca652f492257f35a41) Rich Hickey put out there.
 
 Here's some quick eye candy, though:
 
 ```go
 // dot import for brevity, remember this is a nono
-import . "github.com/sdboyer/transducers-go"
+import . "github.com/sdboyer/go-transducers"
 
 func main() {
 	// To make things work, we need four things (definitions in glossary):
@@ -75,7 +75,7 @@ I figure there's pros and cons to something like this. Makes sense to put em up 
 ### Cons
 
 * Dodges around the type system - there is little to no compile-time safety here.
-* To that end: is Yet Another Generics Attempt™...though, see [#1](https://github.com/sdboyer/transducers-go/issues/1).
+* To that end: is Yet Another Generics Attempt™...though, see [#1](https://github.com/sdboyer/go-transducers/issues/1).
 * Syntax is not as fluid as Clojure's (though creating such things is kind of a Lisp specialty).
 * Pursuant to all of the above, it'd be hard to call this idiomatic Go.
 * The `ValueStream` notion is a bedrock for this system, and has significant flaws.
@@ -88,7 +88,7 @@ I figure there's pros and cons to something like this. Makes sense to put em up 
 * Sure, channels let you be stream-based. But they're [low-level primitives](https://gist.github.com/kachayev/21e7fe149bc5ae0bd878). Plus they're largely orthogonal to this, which is about decomposing processing pipelines into their constituent parts.
 * Transducers could be an interesting, powerful way of structuring applications into segments, or for encapsulating library logic in a way that is easy to reuse, and whose purpose is widely understood.
 * While the loss of type assurances hurts - a lot - the spec for transducer behavior is clear enough that it's probably feasible to aim at "correctness" via exhaustive black-box tests. (hah)
-* And about types - I found a little kernel of something useful when looking beyond parametric polymorphism - [more here](https://github.com/sdboyer/transducers-go/issues/1).
+* And about types - I found a little kernel of something useful when looking beyond parametric polymorphism - [more here](https://github.com/sdboyer/go-transducers/issues/1).
 
 It's also been pointed out to me that these look a bit like [Google's Dataflow](http://googlecloudplatform.blogspot.com/2014/06/sneak-peek-google-cloud-dataflow-a-cloud-native-data-processing-service.html).
 
@@ -97,10 +97,10 @@ It's also been pointed out to me that these look a bit like [Google's Dataflow](
 Transducers have some jargon. Here's an attempt to cut it down. These go more or less in order.
 
 * **Reduce:** If you're not familiar with the general concept of reduction, [LMGTFY](http://en.wikipedia.org/wiki/Fold_(higher-order_function)).
-* **Reduce Step:** A [function](http://godoc.org/github.com/sdboyer/transducers-go#ReduceStep)/method with a reduce-like signature: `(accum, value) return`
-* **Reducer:** A [set of three](http://godoc.org/github.com/sdboyer/transducers-go#Reducer) functions - the Reduce Step, plus Complete and Init methods.
-* **Transducer:** A function that *transforms* a *reducing* function. They [take a reducing func and return another](http://godoc.org/github.com/sdboyer/transducers-go#Transducer).
-* **Predicate:** Some transducers - for example, [Map](http://godoc.org/github.com/sdboyer/transducers-go#Map) and [Filter](http://godoc.org/github.com/sdboyer/transducers-go#Filter) - take a function to do their work. These injected functions are referred to as predicates.
+* **Reduce Step:** A [function](http://godoc.org/github.com/sdboyer/go-transducers#ReduceStep)/method with a reduce-like signature: `(accum, value) return`
+* **Reducer:** A [set of three](http://godoc.org/github.com/sdboyer/go-transducers#Reducer) functions - the Reduce Step, plus Complete and Init methods.
+* **Transducer:** A function that *transforms* a *reducing* function. They [take a reducing func and return another](http://godoc.org/github.com/sdboyer/go-transducers#Transducer).
+* **Predicate:** Some transducers - for example, [Map](http://godoc.org/github.com/sdboyer/go-transducers#Map) and [Filter](http://godoc.org/github.com/sdboyer/transducers-go#Filter) - take a function to do their work. These injected functions are referred to as predicates.
 * **Transducer stack:** In short: `[]Transducer`. A stack is stateless (it's just logic) and can be reused in as many processes as desired.
 * **Bottom reducer:** The reducer that a stack of transducers will operate on.
 * **Processor:** Processors take (at minimum) some kind of collection and a transducer stack, compose a transducer pipeline from the stack, and apply it across the elements of the collection.

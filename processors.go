@@ -1,4 +1,4 @@
-package transduce
+package transducers
 
 // Transduce performs a non-lazy traversal/reduction over the provided value stream.
 func Transduce(coll interface{}, bottom Reducer, tlist ...Transducer) interface{} {

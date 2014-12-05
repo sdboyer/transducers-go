@@ -1,4 +1,4 @@
-package transduce
+package transducers
 
 import "fmt"
 
@@ -128,24 +128,24 @@ func ExampleAttachLoggers_clojureParity() {
 
 	// Output:
 	//SRC -> [0 0 1 1 2 2 3 3 4 4 5 5 6 6 7 7 8 8 9 9 10 10 11] |TERM|
-	//	transduce.map_r -> [1 1 2 2 3 3 4 4 5 5 6 6 7 7 8 8 9 9 10 10 11 11 12] |TERM|
-	//	transduce.filter -> [2 2 4 4 6 6 8 8 10 10 12] |TERM|
-	//	*transduce.dedupe -> [2 4 6 8 10 12] |TERM|
-	//	transduce.mapcat -> [0 1 0 1 2 3 0 1 2 3 4 5 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 8 9 0 1 2] |TERM|
-	//	*transduce.chunk -> [[0 1 0] [1 2 3] [0 1 2] [3 4 5] [0 1 2] [3 4 5] [6 7 0] [1 2 3] [4 5 6] [7 8 9] [0 1 2]] |TERM|
-	//	*transduce.chunkBy -> [[[0 1 0] [1 2 3] [0 1 2]] [[3 4 5]] [[0 1 2]] [[3 4 5] [6 7 0]] [[1 2 3]] [[4 5 6] [7 8 9]]] |TERM|
-	//	transduce.mapcat -> [0 1 0 1 2 3 0 1 2 3 4 5 0 1 2 3 4 5 6 7 0 1 2 3 4 5] |TERM|
-	//	transduce.randomSample -> [0 1 0 1 2 3 0 1 2 3 4 5 0 1 2 3 4 5 6 7 0 1 2 3 4 5] |TERM|
-	//	transduce.takeNth -> [0 1 0 1 2 3 0 1 2 3 4 5 0 1 2 3 4 5 6 7 0 1 2 3 4 5] |TERM|
-	//	transduce.keep -> [1 1 9 1 9 25 1 9 25 49 1 9 25] |TERM|
-	//	*transduce.keepIndexed -> [0 18 36 6 200 10 300] |TERM|
-	//	transduce.replace -> [0 eighteen 36 six 200 10 300] |TERM|
-	//	*transduce.take -> [0 eighteen 36 six 200 10 300] |TERM|
-	//	transduce.takeWhile -> [0 eighteen 36 six 200 10]
-	//	*transduce.drop -> [eighteen 36 six 200 10]
-	//	*transduce.dropWhile -> [36 six 200 10]
-	//	transduce.remove -> [36 200 10]
-	//	transduce.append_bottom
+	//	transducers.map_r -> [1 1 2 2 3 3 4 4 5 5 6 6 7 7 8 8 9 9 10 10 11 11 12] |TERM|
+	//	transducers.filter -> [2 2 4 4 6 6 8 8 10 10 12] |TERM|
+	//	*transducers.dedupe -> [2 4 6 8 10 12] |TERM|
+	//	transducers.mapcat -> [0 1 0 1 2 3 0 1 2 3 4 5 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 8 9 0 1 2] |TERM|
+	//	*transducers.chunk -> [[0 1 0] [1 2 3] [0 1 2] [3 4 5] [0 1 2] [3 4 5] [6 7 0] [1 2 3] [4 5 6] [7 8 9] [0 1 2]] |TERM|
+	//	*transducers.chunkBy -> [[[0 1 0] [1 2 3] [0 1 2]] [[3 4 5]] [[0 1 2]] [[3 4 5] [6 7 0]] [[1 2 3]] [[4 5 6] [7 8 9]]] |TERM|
+	//	transducers.mapcat -> [0 1 0 1 2 3 0 1 2 3 4 5 0 1 2 3 4 5 6 7 0 1 2 3 4 5] |TERM|
+	//	transducers.randomSample -> [0 1 0 1 2 3 0 1 2 3 4 5 0 1 2 3 4 5 6 7 0 1 2 3 4 5] |TERM|
+	//	transducers.takeNth -> [0 1 0 1 2 3 0 1 2 3 4 5 0 1 2 3 4 5 6 7 0 1 2 3 4 5] |TERM|
+	//	transducers.keep -> [1 1 9 1 9 25 1 9 25 49 1 9 25] |TERM|
+	//	*transducers.keepIndexed -> [0 18 36 6 200 10 300] |TERM|
+	//	transducers.replace -> [0 eighteen 36 six 200 10 300] |TERM|
+	//	*transducers.take -> [0 eighteen 36 six 200 10 300] |TERM|
+	//	transducers.takeWhile -> [0 eighteen 36 six 200 10]
+	//	*transducers.drop -> [eighteen 36 six 200 10]
+	//	*transducers.dropWhile -> [36 six 200 10]
+	//	transducers.remove -> [36 200 10]
+	//	transducers.append_bottom
 	//END
 }
 

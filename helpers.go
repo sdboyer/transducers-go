@@ -10,57 +10,57 @@ func fml(v ...interface{}) {
 	}
 }
 
-type reduceStepBase struct {
+type reducerBase struct {
 	next Reducer
 }
 
-func (r reduceStepBase) Complete(accum interface{}) interface{} {
+func (r reducerBase) Complete(accum interface{}) interface{} {
 	// Pure functions inherently can't have any completion work, so flow through
 	return r.next.Complete(accum)
 }
 
-func (r reduceStepBase) Init() interface{} {
+func (r reducerBase) Init() interface{} {
 	return r.next.Init()
 }
 
-type reduceStepHelper struct {
-	R func(accum interface{}, value interface{}) (interface{}, bool)
+type reducerHelper struct {
+	S func(accum interface{}, value interface{}) (interface{}, bool)
 	C func(accum interface{}) interface{}
 	I func() interface{}
 }
 
-func (r reduceStepHelper) Step(accum interface{}, value interface{}) (interface{}, bool) {
-	return r.R(accum, value)
+func (r reducerHelper) Step(accum interface{}, value interface{}) (interface{}, bool) {
+	return r.S(accum, value)
 }
 
-func (r reduceStepHelper) Complete(accum interface{}) interface{} {
+func (r reducerHelper) Complete(accum interface{}) interface{} {
 	return r.C(accum)
 }
 
-func (r reduceStepHelper) Init() interface{} {
+func (r reducerHelper) Init() interface{} {
 	return r.I()
 }
 
-// Creates a helper struct for defining a ReduceStep on the fly.
+// Creates a helper struct for defining a Reducer on the fly.
 //
 // This is mostly useful for creating a bottom reducer with minimal fanfare.
 //
 // This returns an instance of bareReducer, which is a struct containing three
-// function pointers, one for each of the three methods of ReduceStep - R for
-// Reduce, C for Complete, I for Init. The struct implements ReduceStep
+// function pointers, one for each of the three methods of Reducer - S for
+// Step, C for Complete, I for Init. The struct implements Reducer
 // by simply passing method calls along to the contained function pointers.
 //
-// This makes it easier to create ReduceSteps on the fly. The first argument is a
+// This makes it easier to create Reducers on the fly. The first argument is a
 // reducer - if you pass nil, it'll create a no-op reducer for you. If you want to
 // overwrite the other two, do it on the returned struct.
-func CreateStep(r ReduceStep) reduceStepHelper {
-	if r == nil {
-		r = func(accum interface{}, value interface{}) (interface{}, bool) {
+func CreateStep(s ReduceStep) reducerHelper {
+	if s == nil {
+		s = func(accum interface{}, value interface{}) (interface{}, bool) {
 			return accum, false
 		}
 	}
-	return reduceStepHelper{
-		R: r,
+	return reducerHelper{
+		S: s,
 		C: func(accum interface{}) interface{} {
 			return accum
 		},

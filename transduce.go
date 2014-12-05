@@ -60,7 +60,7 @@ func (r ReduceStep) Init() interface{} {
 /* Transducer implementations */
 
 type map_r struct {
-	reduceStepBase
+	reducerBase
 	f Mapper
 }
 
@@ -73,12 +73,12 @@ func (r map_r) Step(accum interface{}, value interface{}) (interface{}, bool) {
 // result along to the next step.
 func Map(f Mapper) Transducer {
 	return func(r Reducer) Reducer {
-		return map_r{reduceStepBase{r}, f}
+		return map_r{reducerBase{r}, f}
 	}
 }
 
 type filter struct {
-	reduceStepBase
+	reducerBase
 	f Filterer
 }
 
@@ -104,7 +104,7 @@ func (r filter) Step(accum interface{}, value interface{}) (interface{}, bool) {
 // and passing it along if it returns true.
 func Filter(f Filterer) Transducer {
 	return func(r Reducer) Reducer {
-		return filter{reduceStepBase{r}, f}
+		return filter{reducerBase{r}, f}
 	}
 }
 
@@ -142,7 +142,7 @@ func Append() Reducer {
 }
 
 type mapcat struct {
-	reduceStepBase
+	reducerBase
 	f Exploder
 }
 
@@ -173,12 +173,12 @@ func (r mapcat) Step(accum interface{}, value interface{}) (interface{}, bool) {
 // individual value along to the next transducer in the pipeline.
 func Mapcat(f Exploder) Transducer {
 	return func(r Reducer) Reducer {
-		return mapcat{reduceStepBase{r}, f}
+		return mapcat{reducerBase{r}, f}
 	}
 }
 
 type dedupe struct {
-	reduceStepBase
+	reducerBase
 	// TODO Slice is fine for prototype, but should replace with type-appropriate
 	// search tree later
 	seen valueSlice
@@ -203,7 +203,7 @@ func (r *dedupe) Step(accum interface{}, value interface{}) (interface{}, bool) 
 // datastructures (maps, slices, channels)!
 func Dedupe() Transducer {
 	return func(r Reducer) Reducer {
-		return &dedupe{reduceStepBase{r}, make([]interface{}, 0)}
+		return &dedupe{reducerBase{r}, make([]interface{}, 0)}
 	}
 }
 
@@ -338,7 +338,7 @@ func RandomSample(ρ float64) Transducer {
 	}
 
 	return func(r Reducer) Reducer {
-		return randomSample{filter{reduceStepBase{r}, func(_ interface{}) bool {
+		return randomSample{filter{reducerBase{r}, func(_ interface{}) bool {
 			//panic("oh shit")
 			return rand.Float64() < ρ
 		}}}
@@ -354,7 +354,7 @@ func TakeNth(n int) Transducer {
 	var count int
 
 	return func(r Reducer) Reducer {
-		return takeNth{filter{reduceStepBase{r}, func(_ interface{}) bool {
+		return takeNth{filter{reducerBase{r}, func(_ interface{}) bool {
 			count++ // TODO atomic
 			return count%n == 0
 		}}}
@@ -362,7 +362,7 @@ func TakeNth(n int) Transducer {
 }
 
 type keep struct {
-	reduceStepBase
+	reducerBase
 	f Mapper
 }
 
@@ -379,12 +379,12 @@ func (r keep) Step(accum interface{}, value interface{}) (interface{}, bool) {
 // Keep calls the provided mapper, then discards any nil value returned from the mapper.
 func Keep(f Mapper) Transducer {
 	return func(r Reducer) Reducer {
-		return keep{reduceStepBase{r}, f}
+		return keep{reducerBase{r}, f}
 	}
 }
 
 type keepIndexed struct {
-	reduceStepBase
+	reducerBase
 	count int
 	f     IndexedMapper
 }
@@ -407,12 +407,12 @@ func (r *keepIndexed) Step(accum interface{}, value interface{}) (interface{}, b
 // return from the mapper.
 func KeepIndexed(f IndexedMapper) Transducer {
 	return func(r Reducer) Reducer {
-		return &keepIndexed{reduceStepBase{r}, 0, f}
+		return &keepIndexed{reducerBase{r}, 0, f}
 	}
 }
 
 type replace struct {
-	reduceStepBase
+	reducerBase
 	pairs map[interface{}]interface{}
 }
 
@@ -429,12 +429,12 @@ func (r replace) Step(accum interface{}, value interface{}) (interface{}, bool) 
 // that has a key in the map with the corresponding value.
 func Replace(pairs map[interface{}]interface{}) Transducer {
 	return func(r Reducer) Reducer {
-		return replace{reduceStepBase{r}, pairs}
+		return replace{reducerBase{r}, pairs}
 	}
 }
 
 type take struct {
-	reduceStepBase
+	reducerBase
 	max   uint
 	count uint
 }
@@ -455,12 +455,12 @@ func (r *take) Step(accum interface{}, value interface{}) (interface{}, bool) {
 // terminate the transducing process.
 func Take(max uint) Transducer {
 	return func(r Reducer) Reducer {
-		return &take{reduceStepBase{r}, max, 0}
+		return &take{reducerBase{r}, max, 0}
 	}
 }
 
 type takeWhile struct {
-	reduceStepBase
+	reducerBase
 	f Filterer
 }
 
@@ -476,12 +476,12 @@ func (r takeWhile) Step(accum interface{}, value interface{}) (interface{}, bool
 // TakeWhile accepts values until the injected filterer function returns false.
 func TakeWhile(f Filterer) Transducer {
 	return func(r Reducer) Reducer {
-		return takeWhile{reduceStepBase{r}, f}
+		return takeWhile{reducerBase{r}, f}
 	}
 }
 
 type drop struct {
-	reduceStepBase
+	reducerBase
 	min   uint
 	count uint
 }
@@ -501,12 +501,12 @@ func (r *drop) Step(accum interface{}, value interface{}) (interface{}, bool) {
 // let everything through unchanged.
 func Drop(min uint) Transducer {
 	return func(r Reducer) Reducer {
-		return &drop{reduceStepBase{r}, min, 0}
+		return &drop{reducerBase{r}, min, 0}
 	}
 }
 
 type dropWhile struct {
-	reduceStepBase
+	reducerBase
 	f        Filterer
 	accepted bool
 }
@@ -527,7 +527,7 @@ func (r *dropWhile) Step(accum interface{}, value interface{}) (interface{}, boo
 // DropWhile drops values until the injected filterer function returns false.
 func DropWhile(f Filterer) Transducer {
 	return func(r Reducer) Reducer {
-		return &dropWhile{reduceStepBase{r}, f, false}
+		return &dropWhile{reducerBase{r}, f, false}
 	}
 }
 
@@ -540,14 +540,14 @@ type remove struct {
 // It is the inverse of Filter.
 func Remove(f Filterer) Transducer {
 	return func(r Reducer) Reducer {
-		return remove{filter{reduceStepBase{r}, func(value interface{}) bool {
+		return remove{filter{reducerBase{r}, func(value interface{}) bool {
 			return !f(value)
 		}}}
 	}
 }
 
 type escape struct {
-	reduceStepBase
+	reducerBase
 	f   Filterer
 	c   chan<- interface{}
 	coc bool
@@ -593,6 +593,6 @@ func (r escape) Complete(accum interface{}) interface{} {
 // is being sent to from elsewhere. Be cognizant.
 func Escape(f Filterer, c chan<- interface{}, closeOnComplete bool) Transducer {
 	return func(r Reducer) Reducer {
-		return escape{reduceStepBase{r}, f, c, closeOnComplete}
+		return escape{reducerBase{r}, f, c, closeOnComplete}
 	}
 }

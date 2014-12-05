@@ -7,7 +7,7 @@ package transduce
 //
 // NOTE: this will block, and/or exhaust memory, on infinite streams.
 func AttachLoggers(logger func(string, ...interface{}) (int, error), tds ...Transducer) []Transducer {
-	tlfunc := func(r ReduceStep) ReduceStep {
+	tlfunc := func(r Reducer) Reducer {
 		tl := &topLogger{reduceLogger{logger: logger, next: r}}
 		return tl
 	}
@@ -40,7 +40,7 @@ func (r *topLogger) Complete(accum interface{}) interface{} {
 }
 
 func logtd(logger func(string, ...interface{}) (int, error)) Transducer {
-	return func(r ReduceStep) ReduceStep {
+	return func(r Reducer) Reducer {
 		lt := &reduceLogger{logger: logger, next: r}
 		return lt
 	}
@@ -49,7 +49,7 @@ func logtd(logger func(string, ...interface{}) (int, error)) Transducer {
 type reduceLogger struct {
 	values []interface{}
 	logger func(string, ...interface{}) (int, error)
-	next   ReduceStep
+	next   Reducer
 	term   bool
 }
 
@@ -66,7 +66,7 @@ func (r *reduceLogger) Complete(accum interface{}) interface{} {
 	return r.next.Complete(accum)
 }
 
-func (r *reduceLogger) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+func (r *reduceLogger) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	// if the transducer produces a ValueStream, dup and dump it. (so, already not infinite-safe)
 	if vs, ok := value.(ValueStream); ok {
 		r.values = append(r.values, IntoSlice(&vs))
@@ -75,6 +75,6 @@ func (r *reduceLogger) Reduce(accum interface{}, value interface{}) (interface{}
 		r.values = append(r.values, value)
 	}
 
-	accum, r.term = r.next.Reduce(accum, value)
+	accum, r.term = r.next.Step(accum, value)
 	return accum, r.term
 }

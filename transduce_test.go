@@ -19,7 +19,7 @@ func dt(t []Transducer) []Transducer {
 }
 
 // tb == testbottom. simple appender
-func tb() ReduceStep {
+func tb() Reducer {
 	b := CreateStep(func(accum interface{}, value interface{}) (interface{}, bool) {
 		return append(accum.([]int), value.(int)), false
 	})

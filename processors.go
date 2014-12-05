@@ -1,7 +1,7 @@
 package transduce
 
 // Transduce performs a non-lazy traversal/reduction over the provided value stream.
-func Transduce(coll interface{}, bottom ReduceStep, tlist ...Transducer) interface{} {
+func Transduce(coll interface{}, bottom Reducer, tlist ...Transducer) interface{} {
 	// Final reducing func - append to slice
 	t := CreatePipeline(bottom, tlist...)
 
@@ -11,7 +11,7 @@ func Transduce(coll interface{}, bottom ReduceStep, tlist ...Transducer) interfa
 
 	for v, done := vs(); !done; v, done = vs() {
 		fml("TRANSDUCE: Main loop:", v)
-		ret, terminate = t.Reduce(ret, v)
+		ret, terminate = t.Step(ret, v)
 		if terminate {
 			break
 		}
@@ -44,7 +44,7 @@ func Transduce(coll interface{}, bottom ReduceStep, tlist ...Transducer) interfa
 // particularly bad idea. It's also a bad idea to use it if your transduction
 // stack has a high degree of fanout, as the queue can become quite large.
 func Eduction(coll interface{}, tlist ...Transducer) ValueStream {
-	var bottom Reducer = func(accum interface{}, value interface{}) (interface{}, bool) {
+	var bottom ReduceStep = func(accum interface{}, value interface{}) (interface{}, bool) {
 		return append(accum.([]interface{}), value), false
 	}
 
@@ -86,7 +86,7 @@ func Eduction(coll interface{}, tlist ...Transducer) ValueStream {
 			}
 
 			// temporarily use the value var
-			value, terminate = pipe.Reduce(queue, input)
+			value, terminate = pipe.Step(queue, input)
 			queue = value.([]interface{})
 			if terminate {
 				// this is here because it's less horrifying than the alternative
@@ -121,7 +121,7 @@ func Go(c <-chan interface{}, retcap int, tlist ...Transducer) <-chan interface{
 
 	go func() {
 		for v := range c {
-			_, terminate = pipe.Reduce(accum, v)
+			_, terminate = pipe.Step(accum, v)
 			if terminate {
 				break
 			}
@@ -137,7 +137,7 @@ type chanReducer struct {
 	c chan<- interface{}
 }
 
-func (c chanReducer) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+func (c chanReducer) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	c.c <- value
 	return accum, false
 }

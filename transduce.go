@@ -3,16 +3,16 @@ package transduce
 import "math/rand"
 
 // The master signature: a reducing step function.
-type Reducer func(accum interface{}, value interface{}) (result interface{}, terminate bool)
+type ReduceStep func(accum interface{}, value interface{}) (result interface{}, terminate bool)
 
 // A transducer transforms a reducing function into a new reducing function.
-type Transducer func(ReduceStep) ReduceStep
+type Transducer func(Reducer) Reducer
 
 // This is separated out because, while Transducers must support Init() (in order to pass
 // the call along), not all processors require Init, so they may take a partial step instead.
-type ReduceStep interface {
+type Reducer interface {
 	// The primary reducing step function, called during normal operation.
-	Reduce(accum interface{}, value interface{}) (result interface{}, terminate bool) // Reducer
+	Step(accum interface{}, value interface{}) (result interface{}, terminate bool) // Reducer
 
 	// Complete is called when the input has been exhausted; stateful transducers
 	// should flush any held state (e.g. values awaiting a full chunk) through here.
@@ -32,8 +32,8 @@ type ReduceStep interface {
 //
 // This function is usually called by processors (Transduce, Eduction, etc.).
 // If you're using one of those, they'll call it when the time is right.
-func CreatePipeline(r ReduceStep, tds ...Transducer) (rs ReduceStep) {
-	rs = ReduceStep(r)
+func CreatePipeline(r Reducer, tds ...Transducer) (rs Reducer) {
+	rs = Reducer(r)
 	// Because a pipeline is a series of wrapped functions, we must walk the list
 	// in reverse order and apply each transducer, starting from the bottom reducer.
 	for i := len(tds) - 1; i >= 0; i-- {
@@ -43,17 +43,17 @@ func CreatePipeline(r ReduceStep, tds ...Transducer) (rs ReduceStep) {
 	return
 }
 
-func (r Reducer) Reduce(accum interface{}, value interface{}) (result interface{}, terminate bool) {
+func (r ReduceStep) Step(accum interface{}, value interface{}) (result interface{}, terminate bool) {
 	return r(accum, value)
 }
 
-func (r Reducer) Complete(accum interface{}) (result interface{}) {
+func (r ReduceStep) Complete(accum interface{}) (result interface{}) {
 	return accum
 }
 
 // TODO binding this to the general function type is maybe not the best idea, but it's simple
 // and works for now
-func (r Reducer) Init() interface{} {
+func (r ReduceStep) Init() interface{} {
 	return make([]interface{}, 0)
 }
 
@@ -64,15 +64,15 @@ type map_r struct {
 	f Mapper
 }
 
-func (r map_r) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+func (r map_r) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	fml("MAP: accum is", accum, "value is", value)
-	return r.next.Reduce(accum, r.f(value))
+	return r.next.Step(accum, r.f(value))
 }
 
 // Map calls its predicate once for each value coming through, passing the
 // result along to the next step.
 func Map(f Mapper) Transducer {
-	return func(r ReduceStep) ReduceStep {
+	return func(r Reducer) Reducer {
 		return map_r{reduceStepBase{r}, f}
 	}
 }
@@ -82,7 +82,7 @@ type filter struct {
 	f Filterer
 }
 
-func (r filter) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+func (r filter) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	fml("FILTER: accum is", accum, "value is", value)
 	var check bool
 	if vs, ok := value.(ValueStream); ok {
@@ -93,7 +93,7 @@ func (r filter) Reduce(accum interface{}, value interface{}) (interface{}, bool)
 	}
 
 	if check {
-		return r.next.Reduce(accum, value)
+		return r.next.Step(accum, value)
 	} else {
 		return accum, false
 	}
@@ -103,7 +103,7 @@ func (r filter) Reduce(accum interface{}, value interface{}) (interface{}, bool)
 // each incoming value, dropping the value if the predicate returns false
 // and passing it along if it returns true.
 func Filter(f Filterer) Transducer {
-	return func(r ReduceStep) ReduceStep {
+	return func(r Reducer) Reducer {
 		return filter{reduceStepBase{r}, f}
 	}
 }
@@ -111,7 +111,7 @@ func Filter(f Filterer) Transducer {
 // for append operations at the bottom of a transducer stack
 type append_bottom struct{}
 
-func (r append_bottom) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+func (r append_bottom) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	fml("APPEND: Appending", value, "onto", accum)
 	switch v := value.(type) {
 	case []int:
@@ -137,7 +137,7 @@ func (r append_bottom) Init() interface{} {
 	return make([]int, 0)
 }
 
-func Append() ReduceStep {
+func Append() Reducer {
 	return append_bottom{}
 }
 
@@ -146,7 +146,7 @@ type mapcat struct {
 	f Exploder
 }
 
-func (r mapcat) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+func (r mapcat) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	fml("MAPCAT: Processing explode val:", value)
 	stream := r.f(value)
 
@@ -160,7 +160,7 @@ func (r mapcat) Reduce(accum interface{}, value interface{}) (interface{}, bool)
 		}
 		fml("MAPCAT: Calling next t on val:", v, "accum is:", accum)
 
-		accum, terminate = r.next.Reduce(accum, v)
+		accum, terminate = r.next.Step(accum, v)
 		if terminate {
 			break
 		}
@@ -172,7 +172,7 @@ func (r mapcat) Reduce(accum interface{}, value interface{}) (interface{}, bool)
 // Mapcat first runs an exploder, then 'concats' results by passing each
 // individual value along to the next transducer in the pipeline.
 func Mapcat(f Exploder) Transducer {
-	return func(r ReduceStep) ReduceStep {
+	return func(r Reducer) Reducer {
 		return mapcat{reduceStepBase{r}, f}
 	}
 }
@@ -184,7 +184,7 @@ type dedupe struct {
 	seen valueSlice
 }
 
-func (r *dedupe) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+func (r *dedupe) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	fml("DEDUPE: have seen", r.seen, "accum is", accum, "value is", value)
 	for _, v := range r.seen {
 		if value == v {
@@ -193,7 +193,7 @@ func (r *dedupe) Reduce(accum interface{}, value interface{}) (interface{}, bool
 	}
 
 	r.seen = append(r.seen, value)
-	return r.next.Reduce(accum, value)
+	return r.next.Step(accum, value)
 }
 
 // Dedupe keeps track of values that have passed through it during this
@@ -202,7 +202,7 @@ func (r *dedupe) Reduce(accum interface{}, value interface{}) (interface{}, bool
 // Simple equality (==) is used for comparison. That will panic on non-hashable
 // datastructures (maps, slices, channels)!
 func Dedupe() Transducer {
-	return func(r ReduceStep) ReduceStep {
+	return func(r Reducer) Reducer {
 		return &dedupe{reduceStepBase{r}, make([]interface{}, 0)}
 	}
 }
@@ -216,7 +216,7 @@ func Chunk(length int) Transducer {
 		panic("chunks must be at least one element in size")
 	}
 
-	return func(r ReduceStep) ReduceStep {
+	return func(r Reducer) Reducer {
 		// TODO look into most memory-savvy ways of doing this
 		return &chunk{length: length, coll: make(valueSlice, length, length), next: r}
 	}
@@ -228,10 +228,10 @@ type chunk struct {
 	count     int
 	terminate bool
 	coll      valueSlice
-	next      ReduceStep
+	next      Reducer
 }
 
-func (t *chunk) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+func (t *chunk) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	fml("CHUNK: Chunk count: ", t.count, "coll contents: ", t.coll)
 	t.coll[t.count] = value
 	t.count++ // TODO atomic
@@ -241,7 +241,7 @@ func (t *chunk) Reduce(accum interface{}, value interface{}) (interface{}, bool)
 		newcoll := make(valueSlice, t.length, t.length)
 		copy(newcoll, t.coll)
 		fml("CHUNK: passing val to next td:", t.coll)
-		accum, t.terminate = t.next.Reduce(accum, newcoll.AsStream())
+		accum, t.terminate = t.next.Step(accum, newcoll.AsStream())
 		return accum, t.terminate
 	} else {
 		return accum, false
@@ -254,7 +254,7 @@ func (t *chunk) Complete(accum interface{}) interface{} {
 	if t.count != 0 && !t.terminate {
 		fml("CHUNK: Leftover values found, passing coll to next td:", t.coll[:t.count])
 		// should be fine to send the original, we know we're done
-		accum, t.terminate = t.next.Reduce(accum, t.coll[:t.count].AsStream())
+		accum, t.terminate = t.next.Step(accum, t.coll[:t.count].AsStream())
 	}
 
 	return t.next.Complete(accum)
@@ -268,7 +268,7 @@ func (t *chunk) Init() interface{} {
 // represented by ValueStreams. A new contiguous stream is created every time
 // the injected filter function returns a different value from the previous.
 func ChunkBy(f Mapper) Transducer {
-	return func(r ReduceStep) ReduceStep {
+	return func(r Reducer) Reducer {
 		// TODO look into most memory-savvy ways of doing this
 		return &chunkBy{chunker: f, coll: make(valueSlice, 0), next: r, first: true, last: nil}
 	}
@@ -279,11 +279,11 @@ type chunkBy struct {
 	first     bool
 	last      interface{}
 	coll      valueSlice
-	next      ReduceStep
+	next      Reducer
 	terminate bool
 }
 
-func (t *chunkBy) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+func (t *chunkBy) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	fml("CHUNKBY: accum val:", accum, "incoming value", value, "coll contents:", t.coll)
 	var chunkval interface{}
 	if vs, ok := value.(ValueStream); ok {
@@ -304,7 +304,7 @@ func (t *chunkBy) Reduce(accum interface{}, value interface{}) (interface{}, boo
 	} else {
 		fml("CHUNKBY: chunk finished, passing coll to next td:", t.coll)
 		t.last = chunkval
-		accum, t.terminate = t.next.Reduce(accum, t.coll.AsStream())
+		accum, t.terminate = t.next.Step(accum, t.coll.AsStream())
 		t.coll = nil
 		t.coll = append(t.coll, value)
 	}
@@ -316,7 +316,7 @@ func (t *chunkBy) Complete(accum interface{}) interface{} {
 	// if there's a partially-completed chunk, send it through reduction as-is
 	if len(t.coll) != 0 && !t.terminate {
 		fml("CHUNKBY: Leftover values found, passing coll to next td:", t.coll)
-		accum, t.terminate = t.next.Reduce(accum, t.coll.AsStream())
+		accum, t.terminate = t.next.Step(accum, t.coll.AsStream())
 	}
 
 	return t.next.Complete(accum)
@@ -337,7 +337,7 @@ func RandomSample(ρ float64) Transducer {
 		panic("ρ must be in the range [0.0,1.0].")
 	}
 
-	return func(r ReduceStep) ReduceStep {
+	return func(r Reducer) Reducer {
 		return randomSample{filter{reduceStepBase{r}, func(_ interface{}) bool {
 			//panic("oh shit")
 			return rand.Float64() < ρ
@@ -353,7 +353,7 @@ type takeNth struct {
 func TakeNth(n int) Transducer {
 	var count int
 
-	return func(r ReduceStep) ReduceStep {
+	return func(r Reducer) Reducer {
 		return takeNth{filter{reduceStepBase{r}, func(_ interface{}) bool {
 			count++ // TODO atomic
 			return count%n == 0
@@ -366,11 +366,11 @@ type keep struct {
 	f Mapper
 }
 
-func (r keep) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+func (r keep) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	fml("KEEP: accum is", accum, "value is", value)
 	nv := r.f(value)
 	if nv != nil {
-		return r.next.Reduce(accum, nv)
+		return r.next.Step(accum, nv)
 	}
 	fml("KEEP: discarding nil")
 	return accum, false
@@ -378,7 +378,7 @@ func (r keep) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
 
 // Keep calls the provided mapper, then discards any nil value returned from the mapper.
 func Keep(f Mapper) Transducer {
-	return func(r ReduceStep) ReduceStep {
+	return func(r Reducer) Reducer {
 		return keep{reduceStepBase{r}, f}
 	}
 }
@@ -389,13 +389,13 @@ type keepIndexed struct {
 	f     IndexedMapper
 }
 
-func (r *keepIndexed) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+func (r *keepIndexed) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	fml("KEEPINDEXED: accum is", accum, "value is", value, "count is", r.count)
 	nv := r.f(r.count, value)
 	r.count++ // TODO atomic
 
 	if nv != nil {
-		return r.next.Reduce(accum, nv)
+		return r.next.Step(accum, nv)
 	}
 
 	fml("KEEPINDEXED: discarding nil")
@@ -406,7 +406,7 @@ func (r *keepIndexed) Reduce(accum interface{}, value interface{}) (interface{},
 // KeepIndexed calls the provided indexed mapper, then discards any nil value
 // return from the mapper.
 func KeepIndexed(f IndexedMapper) Transducer {
-	return func(r ReduceStep) ReduceStep {
+	return func(r Reducer) Reducer {
 		return &keepIndexed{reduceStepBase{r}, 0, f}
 	}
 }
@@ -416,19 +416,19 @@ type replace struct {
 	pairs map[interface{}]interface{}
 }
 
-func (r replace) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+func (r replace) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	if v, exists := r.pairs[value]; exists {
 		fml("REPLACE: match found, replacing", value, "with", v)
-		return r.next.Reduce(accum, v)
+		return r.next.Step(accum, v)
 	}
 	fml("REPLACE: no match, passing along", value)
-	return r.next.Reduce(accum, value)
+	return r.next.Step(accum, value)
 }
 
 // Given a map of replacement value pairs, will replace any value moving through
 // that has a key in the map with the corresponding value.
 func Replace(pairs map[interface{}]interface{}) Transducer {
-	return func(r ReduceStep) ReduceStep {
+	return func(r Reducer) Reducer {
 		return replace{reduceStepBase{r}, pairs}
 	}
 }
@@ -439,14 +439,14 @@ type take struct {
 	count uint
 }
 
-func (r *take) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+func (r *take) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	r.count++ // TODO atomic
 	fml("TAKE: processing item", r.count, "of", r.max, "; accum is", accum, "value is", value)
 	if r.count < r.max {
-		return r.next.Reduce(accum, value)
+		return r.next.Step(accum, value)
 	}
 	// should NEVER be called again after this. add a panic branch?
-	accum, _ = r.next.Reduce(accum, value)
+	accum, _ = r.next.Step(accum, value)
 	fml("TAKE: reached final item, returning terminator")
 	return accum, true
 }
@@ -454,7 +454,7 @@ func (r *take) Reduce(accum interface{}, value interface{}) (interface{}, bool) 
 // Take specifies a maximum number of values to receive, after which it will
 // terminate the transducing process.
 func Take(max uint) Transducer {
-	return func(r ReduceStep) ReduceStep {
+	return func(r Reducer) Reducer {
 		return &take{reduceStepBase{r}, max, 0}
 	}
 }
@@ -464,18 +464,18 @@ type takeWhile struct {
 	f Filterer
 }
 
-func (r takeWhile) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+func (r takeWhile) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	fml("TAKEWHILE: accum is", accum, "value is", value)
 	if !r.f(value) {
 		fml("TAKEWHILE: filtering func returned false, terminating")
 		return accum, true
 	}
-	return r.next.Reduce(accum, value)
+	return r.next.Step(accum, value)
 }
 
 // TakeWhile accepts values until the injected filterer function returns false.
 func TakeWhile(f Filterer) Transducer {
-	return func(r ReduceStep) ReduceStep {
+	return func(r Reducer) Reducer {
 		return takeWhile{reduceStepBase{r}, f}
 	}
 }
@@ -486,7 +486,7 @@ type drop struct {
 	count uint
 }
 
-func (r *drop) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+func (r *drop) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	fml("DROP: processing item", r.count+1, ", min is", r.min, "; accum is", accum, "value is", value)
 	if r.count < r.min {
 		// Increment inside so no mutation after threshold is met
@@ -494,13 +494,13 @@ func (r *drop) Reduce(accum interface{}, value interface{}) (interface{}, bool) 
 		return accum, false
 	}
 	// should NEVER be called again after this. add a panic branch?
-	return r.next.Reduce(accum, value)
+	return r.next.Step(accum, value)
 }
 
 // Drop specifies a number of values to initially ignore, after which it will
 // let everything through unchanged.
 func Drop(min uint) Transducer {
-	return func(r ReduceStep) ReduceStep {
+	return func(r Reducer) Reducer {
 		return &drop{reduceStepBase{r}, min, 0}
 	}
 }
@@ -511,7 +511,7 @@ type dropWhile struct {
 	accepted bool
 }
 
-func (r *dropWhile) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+func (r *dropWhile) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	fml("DROPWHILE: accum is", accum, "value is", value)
 	if !r.accepted {
 		if !r.f(value) {
@@ -521,12 +521,12 @@ func (r *dropWhile) Reduce(accum interface{}, value interface{}) (interface{}, b
 			return accum, false
 		}
 	}
-	return r.next.Reduce(accum, value)
+	return r.next.Step(accum, value)
 }
 
 // DropWhile drops values until the injected filterer function returns false.
 func DropWhile(f Filterer) Transducer {
-	return func(r ReduceStep) ReduceStep {
+	return func(r Reducer) Reducer {
 		return &dropWhile{reduceStepBase{r}, f, false}
 	}
 }
@@ -539,7 +539,7 @@ type remove struct {
 //
 // It is the inverse of Filter.
 func Remove(f Filterer) Transducer {
-	return func(r ReduceStep) ReduceStep {
+	return func(r Reducer) Reducer {
 		return remove{filter{reduceStepBase{r}, func(value interface{}) bool {
 			return !f(value)
 		}}}
@@ -553,7 +553,7 @@ type escape struct {
 	coc bool
 }
 
-func (r escape) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+func (r escape) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	var check bool
 	if vs, ok := value.(ValueStream); ok {
 		vs, value = vs.Split()
@@ -566,7 +566,7 @@ func (r escape) Reduce(accum interface{}, value interface{}) (interface{}, bool)
 		r.c <- value
 		return accum, false
 	} else {
-		return r.next.Reduce(accum, value)
+		return r.next.Step(accum, value)
 	}
 }
 
@@ -592,7 +592,7 @@ func (r escape) Complete(accum interface{}) interface{} {
 // auto-cleanup, but could cause panics (send on closed channel) if the channel
 // is being sent to from elsewhere. Be cognizant.
 func Escape(f Filterer, c chan<- interface{}, closeOnComplete bool) Transducer {
-	return func(r ReduceStep) ReduceStep {
+	return func(r Reducer) Reducer {
 		return escape{reduceStepBase{r}, f, c, closeOnComplete}
 	}
 }

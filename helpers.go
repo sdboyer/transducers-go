@@ -11,7 +11,7 @@ func fml(v ...interface{}) {
 }
 
 type reduceStepBase struct {
-	next ReduceStep
+	next Reducer
 }
 
 func (r reduceStepBase) Complete(accum interface{}) interface{} {
@@ -29,7 +29,7 @@ type reduceStepHelper struct {
 	I func() interface{}
 }
 
-func (r reduceStepHelper) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
+func (r reduceStepHelper) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	return r.R(accum, value)
 }
 
@@ -53,7 +53,7 @@ func (r reduceStepHelper) Init() interface{} {
 // This makes it easier to create ReduceSteps on the fly. The first argument is a
 // reducer - if you pass nil, it'll create a no-op reducer for you. If you want to
 // overwrite the other two, do it on the returned struct.
-func CreateStep(r Reducer) reduceStepHelper {
+func CreateStep(r ReduceStep) reduceStepHelper {
 	if r == nil {
 		r = func(accum interface{}, value interface{}) (interface{}, bool) {
 			return accum, false

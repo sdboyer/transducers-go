@@ -250,9 +250,9 @@ func TestRemove(t *testing.T) {
 }
 
 func TestFlattenValueStream(t *testing.T) {
-	stream := flattenValueStream(ValueSlice{
+	stream := flattenValueStream(valueSlice{
 		ToStream([]int{0, 1}),
-		ValueSlice{
+		valueSlice{
 			ToStream([]int{2, 3}),
 			ToStream([]int{4, 5, 6}),
 		}.AsStream(),
@@ -298,17 +298,17 @@ func TestStreamSplit(t *testing.T) {
 	intSliceEquals([]int{0, 1, 2}, res2, t)
 
 	// test recursive
-	base := ValueSlice{
+	base := valueSlice{
 		[]int{0, 1},
-		ValueSlice{
+		valueSlice{
 			[]int{2, 3},
 			[]int{4, 5, 6},
 		},
 		[]int{7, 8},
 	}
-	rstream := ValueSlice{
+	rstream := valueSlice{
 		ToStream([]int{0, 1}),
-		ValueSlice{
+		valueSlice{
 			ToStream([]int{2, 3}),
 			ToStream([]int{4, 5, 6}),
 		}.AsStream(),

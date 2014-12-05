@@ -195,7 +195,7 @@ func ToStream(collection interface{}) ValueStream {
 	case []int:
 		return iteratorToValueStream(&intSliceIterator{slice: c})
 	case []interface{}:
-		return ValueSlice(c).AsStream()
+		return valueSlice(c).AsStream()
 	case ValueStream:
 		return c
 	default:
@@ -286,9 +286,9 @@ func (i *intSliceIterator) Done() {
 
 }
 
-type ValueSlice []interface{}
+type valueSlice []interface{}
 
-func (s ValueSlice) AsStream() ValueStream {
+func (s valueSlice) AsStream() ValueStream {
 	return iteratorToValueStream(&interfaceSliceIterator{slice: s})
 }
 

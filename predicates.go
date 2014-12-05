@@ -68,7 +68,7 @@ func Flatten(value interface{}) ValueStream {
 		return flattenValueStream(v)
 	case []interface{}:
 		// TODO maybe detect ValueStreams here, too, but probably better to just be consistent
-		return ValueSlice(v).AsStream()
+		return valueSlice(v).AsStream()
 	case []int:
 		return ToStream(v)
 	case int, interface{}:

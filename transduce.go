@@ -181,7 +181,7 @@ type dedupe struct {
 	reduceStepBase
 	// TODO Slice is fine for prototype, but should replace with type-appropriate
 	// search tree later
-	seen ValueSlice
+	seen valueSlice
 }
 
 func (r *dedupe) Reduce(accum interface{}, value interface{}) (interface{}, bool) {
@@ -218,7 +218,7 @@ func Chunk(length int) Transducer {
 
 	return func(r ReduceStep) ReduceStep {
 		// TODO look into most memory-savvy ways of doing this
-		return &chunk{length: length, coll: make(ValueSlice, length, length), next: r}
+		return &chunk{length: length, coll: make(valueSlice, length, length), next: r}
 	}
 }
 
@@ -227,7 +227,7 @@ type chunk struct {
 	length    int
 	count     int
 	terminate bool
-	coll      ValueSlice
+	coll      valueSlice
 	next      ReduceStep
 }
 
@@ -238,7 +238,7 @@ func (t *chunk) Reduce(accum interface{}, value interface{}) (interface{}, bool)
 
 	if t.count == t.length {
 		t.count = 0
-		newcoll := make(ValueSlice, t.length, t.length)
+		newcoll := make(valueSlice, t.length, t.length)
 		copy(newcoll, t.coll)
 		fml("CHUNK: passing val to next td:", t.coll)
 		accum, t.terminate = t.next.Reduce(accum, newcoll.AsStream())
@@ -270,7 +270,7 @@ func (t *chunk) Init() interface{} {
 func ChunkBy(f Mapper) Transducer {
 	return func(r ReduceStep) ReduceStep {
 		// TODO look into most memory-savvy ways of doing this
-		return &chunkBy{chunker: f, coll: make(ValueSlice, 0), next: r, first: true, last: nil}
+		return &chunkBy{chunker: f, coll: make(valueSlice, 0), next: r, first: true, last: nil}
 	}
 }
 
@@ -278,7 +278,7 @@ type chunkBy struct {
 	chunker   Mapper
 	first     bool
 	last      interface{}
-	coll      ValueSlice
+	coll      valueSlice
 	next      ReduceStep
 	terminate bool
 }

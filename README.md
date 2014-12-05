@@ -1,6 +1,8 @@
 # Transducers for Go
 
-This is an implementation of transducers, a concept [from Clojure](http://clojure.org), for Go.
+[![Build Status](https://travis-ci.org/sdboyer/transducers-go.svg?branch=master)](https://travis-ci.org/sdboyer/transducers-go)
+
+This is an implementation of transducers, a concept from [Clojure](http://clojure.org), for Go.
 
 Transducers can be tricky to understand with just an abstract description, but here it is:
 
@@ -22,9 +24,9 @@ Here's some resources - mostly in Clojure, of course:
 * Some [examples](http://ianrumford.github.io/blog/2014/08/08/Some-trivial-examples-of-using-Clojure-Transducers/) of [uses](http://matthiasnehlsen.com/blog/2014/10/06/Building-Systems-in-Clojure-2/) for transducers...mostly just toy stuff
 * A couple [blog](http://blog.podsnap.com/ducers2.html) [posts](http://conscientiousprogrammer.com/blog/2014/08/07/understanding-cloure-transducers-through-types/) examining type issues with transducers
 
-## Pudding <= Proof
+## Proof -> Pudding
 
-I'm calling this proof of concept "done" because [it's pretty much replicated](http://godoc.org/github.com/sdboyer/transducers-go#ex-package--ClojureParity) a very thorough example Rich Hickey put out there.
+I'm calling this proof of concept "done" because [it can pretty much replicate](http://godoc.org/github.com/sdboyer/transducers-go#ex-package--ClojureParity) a [very thorough example](https://gist.github.com/sdboyer/9fca652f492257f35a41) Rich Hickey put out there.
 
 Here's some quick eye candy, though:
 
@@ -88,17 +90,18 @@ I figure there's pros and cons to something like this. Makes sense to put em up 
 * While the loss of type assurances hurts - a lot - the spec for transducer behavior is clear enough that it's probably feasible to aim at "correctness" via exhaustive black-box tests. (hah)
 * And about types - I found a little kernel of something useful when looking beyond parametric polymorphism - [more here](https://github.com/sdboyer/transducers-go/issues/1).
 
-It's also been pointed out to me that these look a bit like [Google's Dataflow](http://googlecloudplatform.blogspot.com/2014/06/sneak-peek-google-cloud-dataflow-a-cloud-native-data-processing-service.html)
+It's also been pointed out to me that these look a bit like [Google's Dataflow](http://googlecloudplatform.blogspot.com/2014/06/sneak-peek-google-cloud-dataflow-a-cloud-native-data-processing-service.html).
 
 ## Glossary
 
-Transducers have some jargon. Here's an attempt to cut it down:
+Transducers have some jargon. Here's an attempt to cut it down. These go more or less in order.
 
-* **Reduce:** Many languages have some version of this, but the basic notion is, "traverse a collection; for each element, pass an accumulated value and the element to a func. Use the return of that func as the accum for the next element."
-* **Reducing function:** I've tried to be consistent about this in the docs, but things may get a little muddled here, and especially in the clojure discussions, between two concepts: a single function with the signature `func (accum interface{}, value interface{}) (result interface{}, terminate bool)`, and an interface with a method named `Reduce` having that signature, a 1-arity function named `Complete`, and a 0-arity function named `Init`. In this lib, these are the func type `Reducer` and interface type `ReduceStep`, respectively. This split reflects the fact that while `Reduce()` is the main concept this whole framework is built around, the other two methods must come along with to make things work.
-* **Transducer:** A function that *transforms* a *reducing* function. They take a reducing func and return another: `type Transducer func(ReduceStep) ReduceStep`, wrapping their transformation on top of whatever that reducing func does.
-* **Predicate:** Some transducers - for example, `Map` and `Filter` - take a function to do their work. These injected functions are referred to as predicates.
-* **Bottom reducer:** Since the Transducer signature dictates that they take and return a ReduceStep, they're cyclical. No matter how many Transducers you stack up, they must be rooted onto plain ReduceStep. That root is often referred to as the "bottom" reducer, as it sits at the bottom of the transduction stack.
-* **Transducer stack:** In short: `[]Transducer`. The expectation is that a set of transducers can be assembled, and then applied over and over again via different transduction processors. This is because `[]Transducer` is a fundamentally stateless bunch of logic.
-* **Processor:** On their own, transducers are inert logic. Processors take (at minimum) a collection and a transducer stack, compose a transducer pipeline from the stack, and apply it across the collection.
+* **Reduce:** If you're not familiar with the general concept of reduction, [LMGTFY](http://en.wikipedia.org/wiki/Fold_(higher-order_function)).
+* **Reduce Step:** A [function](http://godoc.org/github.com/sdboyer/transducers-go#ReduceStep)/method with a reduce-like signature: `(accum, value) return`
+* **Reducer:** A [set of three](http://godoc.org/github.com/sdboyer/transducers-go#Reducer) functions - the Reduce Step, plus Complete and Init methods.
+* **Transducer:** A function that *transforms* a *reducing* function. They [take a reducing func and return another](http://godoc.org/github.com/sdboyer/transducers-go#Transducer).
+* **Predicate:** Some transducers - for example, [Map](http://godoc.org/github.com/sdboyer/transducers-go#Map) and [Filter](http://godoc.org/github.com/sdboyer/transducers-go#Filter) - take a function to do their work. These injected functions are referred to as predicates.
+* **Transducer stack:** In short: `[]Transducer`. A stack is stateless (it's just logic) and can be reused in as many processes as desired.
+* **Bottom reducer:** The reducer that a stack of transducers will operate on.
+* **Processor:** Processors take (at minimum) some kind of collection and a transducer stack, compose a transducer pipeline from the stack, and apply it across the elements of the collection.
 

@@ -9,6 +9,12 @@ package transduce
 // very simple: call the function. If the second val is true, the iterator
 // is exhausted. If not, the first return value is the next value.
 //
+// The most important thing to understand is that ValueStreams are the
+// *only* thing that transducers treat as being a set of values: if a slice
+// or map is passed through a transduction process, transducers that deal
+// with multiple values will treat a slice as a single value, but a ValueStream
+// as multiple. This is why Exploders return a ValueStream.
+//
 // TODO At minimum, a proper implementation would probably need to include a
 // adding a parameter that allows the caller to indicate they no longer
 // need the stream. (Not quite a 'close', but possibly interpreted that way)
@@ -73,7 +79,7 @@ func IntoSlice(vs *ValueStream) (into []interface{}) {
 // Note that calls to the original stream will still work - and any values
 // consumed that way will be missed by the split streams. Be very careful!
 //
-// TODO I think this might leak
+// TODO I think this might leak?
 // TODO figure out if there's a nifty way to make this threadsafe
 func (vs ValueStream) Split() (ValueStream, ValueStream) {
 	var src ValueStream = vs

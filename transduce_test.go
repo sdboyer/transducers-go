@@ -9,7 +9,13 @@ var ints = []int{1, 2, 3, 4, 5}
 var evens = []int{2, 4}
 
 func dt(t []Transducer) []Transducer {
-	return AttachLoggers(fmt.Printf, t...)
+	if testing.Verbose() {
+		return AttachLoggers(fmt.Printf, t...)
+	} else {
+		return AttachLoggers(func(s string, v ...interface{}) (int, error) {
+			return 0, nil
+		}, t...)
+	}
 }
 
 // tb == testbottom. simple appender
@@ -317,7 +323,6 @@ func TestStreamSplit(t *testing.T) {
 
 	rstream, dup := rstream.Split()
 	r1 := ToSlice(rstream)
-	fmt.Println(r1)
 	if fmt.Sprintf("%v", r1) != fmt.Sprintf("%v", base) {
 		t.Error("First stream not expected value, got", r1)
 	}

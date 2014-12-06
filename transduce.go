@@ -65,7 +65,6 @@ type map_r struct {
 }
 
 func (r map_r) Step(accum interface{}, value interface{}) (interface{}, bool) {
-	fml("MAP: accum is", accum, "value is", value)
 	return r.next.Step(accum, r.f(value))
 }
 
@@ -83,7 +82,6 @@ type filter struct {
 }
 
 func (r filter) Step(accum interface{}, value interface{}) (interface{}, bool) {
-	fml("FILTER: accum is", accum, "value is", value)
 	var check bool
 	if vs, ok := value.(ValueStream); ok {
 		vs, value = vs.Split()
@@ -112,7 +110,6 @@ func Filter(f Filterer) Transducer {
 type append_bottom struct{}
 
 func (r append_bottom) Step(accum interface{}, value interface{}) (interface{}, bool) {
-	fml("APPEND: Appending", value, "onto", accum)
 	switch v := value.(type) {
 	case []int:
 		return append(accum.([]int), v...), false
@@ -120,7 +117,6 @@ func (r append_bottom) Step(accum interface{}, value interface{}) (interface{}, 
 		return append(accum.([]int), v), false
 	case ValueStream:
 		flattenValueStream(v).Each(func(value interface{}) {
-			fml("APPEND: *actually* appending ", value, "onto", accum)
 			accum = append(accum.([]int), value.(int))
 		})
 		return accum, false
@@ -147,7 +143,6 @@ type mapcat struct {
 }
 
 func (r mapcat) Step(accum interface{}, value interface{}) (interface{}, bool) {
-	fml("MAPCAT: Processing explode val:", value)
 	stream := r.f(value)
 
 	var v interface{}
@@ -158,7 +153,6 @@ func (r mapcat) Step(accum interface{}, value interface{}) (interface{}, bool) {
 		if done {
 			break
 		}
-		fml("MAPCAT: Calling next t on val:", v, "accum is:", accum)
 
 		accum, terminate = r.next.Step(accum, v)
 		if terminate {
@@ -185,7 +179,6 @@ type dedupe struct {
 }
 
 func (r *dedupe) Step(accum interface{}, value interface{}) (interface{}, bool) {
-	fml("DEDUPE: have seen", r.seen, "accum is", accum, "value is", value)
 	for _, v := range r.seen {
 		if value == v {
 			return accum, false
@@ -232,7 +225,6 @@ type chunk struct {
 }
 
 func (t *chunk) Step(accum interface{}, value interface{}) (interface{}, bool) {
-	fml("CHUNK: Chunk count: ", t.count, "coll contents: ", t.coll)
 	t.coll[t.count] = value
 	t.count++ // TODO atomic
 
@@ -240,7 +232,6 @@ func (t *chunk) Step(accum interface{}, value interface{}) (interface{}, bool) {
 		t.count = 0
 		newcoll := make(valueSlice, t.length, t.length)
 		copy(newcoll, t.coll)
-		fml("CHUNK: passing val to next td:", t.coll)
 		accum, t.terminate = t.next.Step(accum, newcoll.AsStream())
 		return accum, t.terminate
 	} else {
@@ -249,10 +240,8 @@ func (t *chunk) Step(accum interface{}, value interface{}) (interface{}, bool) {
 }
 
 func (t *chunk) Complete(accum interface{}) interface{} {
-	fml("CHUNK: Completing...")
 	// if there's a partially-completed chunk, send it through reduction as-is
 	if t.count != 0 && !t.terminate {
-		fml("CHUNK: Leftover values found, passing coll to next td:", t.coll[:t.count])
 		// should be fine to send the original, we know we're done
 		accum, t.terminate = t.next.Step(accum, t.coll[:t.count].AsStream())
 	}
@@ -284,7 +273,6 @@ type chunkBy struct {
 }
 
 func (t *chunkBy) Step(accum interface{}, value interface{}) (interface{}, bool) {
-	fml("CHUNKBY: accum val:", accum, "incoming value", value, "coll contents:", t.coll)
 	var chunkval interface{}
 	if vs, ok := value.(ValueStream); ok {
 		vs, value = vs.Split()
@@ -294,15 +282,12 @@ func (t *chunkBy) Step(accum interface{}, value interface{}) (interface{}, bool)
 	}
 
 	if t.first { // nothing to compare against if first pass
-		fml("CHUNKBY: first entry; appending this val to coll:", chunkval)
 		t.first = false
 		t.last = chunkval
 		t.coll = append(t.coll, value)
 	} else if t.last == chunkval {
-		fml("CHUNKBY: chunk unfinished; appending this val to coll:", chunkval)
 		t.coll = append(t.coll, value)
 	} else {
-		fml("CHUNKBY: chunk finished, passing coll to next td:", t.coll)
 		t.last = chunkval
 		accum, t.terminate = t.next.Step(accum, t.coll.AsStream())
 		t.coll = nil
@@ -312,10 +297,8 @@ func (t *chunkBy) Step(accum interface{}, value interface{}) (interface{}, bool)
 }
 
 func (t *chunkBy) Complete(accum interface{}) interface{} {
-	fml("CHUNKBY: Completing...")
 	// if there's a partially-completed chunk, send it through reduction as-is
 	if len(t.coll) != 0 && !t.terminate {
-		fml("CHUNKBY: Leftover values found, passing coll to next td:", t.coll)
 		accum, t.terminate = t.next.Step(accum, t.coll.AsStream())
 	}
 
@@ -367,12 +350,10 @@ type keep struct {
 }
 
 func (r keep) Step(accum interface{}, value interface{}) (interface{}, bool) {
-	fml("KEEP: accum is", accum, "value is", value)
 	nv := r.f(value)
 	if nv != nil {
 		return r.next.Step(accum, nv)
 	}
-	fml("KEEP: discarding nil")
 	return accum, false
 }
 
@@ -390,7 +371,6 @@ type keepIndexed struct {
 }
 
 func (r *keepIndexed) Step(accum interface{}, value interface{}) (interface{}, bool) {
-	fml("KEEPINDEXED: accum is", accum, "value is", value, "count is", r.count)
 	nv := r.f(r.count, value)
 	r.count++ // TODO atomic
 
@@ -398,7 +378,6 @@ func (r *keepIndexed) Step(accum interface{}, value interface{}) (interface{}, b
 		return r.next.Step(accum, nv)
 	}
 
-	fml("KEEPINDEXED: discarding nil")
 	return accum, false
 
 }
@@ -418,10 +397,8 @@ type replace struct {
 
 func (r replace) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	if v, exists := r.pairs[value]; exists {
-		fml("REPLACE: match found, replacing", value, "with", v)
 		return r.next.Step(accum, v)
 	}
-	fml("REPLACE: no match, passing along", value)
 	return r.next.Step(accum, value)
 }
 
@@ -441,13 +418,11 @@ type take struct {
 
 func (r *take) Step(accum interface{}, value interface{}) (interface{}, bool) {
 	r.count++ // TODO atomic
-	fml("TAKE: processing item", r.count, "of", r.max, "; accum is", accum, "value is", value)
 	if r.count < r.max {
 		return r.next.Step(accum, value)
 	}
 	// should NEVER be called again after this. add a panic branch?
 	accum, _ = r.next.Step(accum, value)
-	fml("TAKE: reached final item, returning terminator")
 	return accum, true
 }
 
@@ -465,9 +440,7 @@ type takeWhile struct {
 }
 
 func (r takeWhile) Step(accum interface{}, value interface{}) (interface{}, bool) {
-	fml("TAKEWHILE: accum is", accum, "value is", value)
 	if !r.f(value) {
-		fml("TAKEWHILE: filtering func returned false, terminating")
 		return accum, true
 	}
 	return r.next.Step(accum, value)
@@ -487,7 +460,6 @@ type drop struct {
 }
 
 func (r *drop) Step(accum interface{}, value interface{}) (interface{}, bool) {
-	fml("DROP: processing item", r.count+1, ", min is", r.min, "; accum is", accum, "value is", value)
 	if r.count < r.min {
 		// Increment inside so no mutation after threshold is met
 		r.count++ // TODO atomic
@@ -512,10 +484,8 @@ type dropWhile struct {
 }
 
 func (r *dropWhile) Step(accum interface{}, value interface{}) (interface{}, bool) {
-	fml("DROPWHILE: accum is", accum, "value is", value)
 	if !r.accepted {
 		if !r.f(value) {
-			fml("DROPWHILE: filtering func returned false, accepting from now on")
 			r.accepted = true
 		} else {
 			return accum, false

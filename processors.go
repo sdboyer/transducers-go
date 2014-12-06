@@ -10,7 +10,6 @@ func Transduce(coll interface{}, bottom Reducer, tlist ...Transducer) interface{
 	var terminate bool
 
 	for v, done := vs(); !done; v, done = vs() {
-		fml("TRANSDUCE: Main loop:", v)
 		ret, terminate = t.Step(ret, v)
 		if terminate {
 			break

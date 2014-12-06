@@ -20,10 +20,8 @@ type Exploder func(interface{}) ValueStream
 
 func sum(vs ValueStream) (total int) {
 	vs.Each(func(value interface{}) {
-		fml("SUM: total", total)
 		total += value.(int)
 	})
-	fml("SUM: final total", total)
 
 	return
 }

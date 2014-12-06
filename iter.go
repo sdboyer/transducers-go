@@ -148,11 +148,9 @@ func flattenValueStream(vs ValueStream) ValueStream {
 	ss = append(ss, vs)
 
 	var f ValueStream
-	fml("FVS: creating stream stack func")
 
 	f = func() (value interface{}, done bool) {
 		size := len(ss)
-		fml("FVS: stream stack now size", size)
 		if size == 0 {
 			// no streams left, we're definitely done
 			return nil, true
@@ -160,24 +158,20 @@ func flattenValueStream(vs ValueStream) ValueStream {
 
 		// grab value from stream on top of stack
 		value, done = ss[size-1]()
-		fml("FVS: value grabbed:", value, "done state", done)
 
 		if done {
 			// this stream is done; pop the stack and recurse
-			fml("FVS: finished stream, popping and recursing")
 			ss = ss[:size-1]
 			return f()
 		}
 
 		if innerstream, ok := value.(ValueStream); ok {
 			// we got another stream, push it on the stack and recurse
-			fml("FVS: found new stream, pushing and recursing")
 			ss = append(ss, innerstream)
 			return f()
 		}
 
 		// most basic case - we found a leaf. return it.
-		fml("FVS: found a value:", value)
 		return
 	}
 

@@ -74,6 +74,8 @@ func main() {
 ## The Arguments
 I figure there's pros and cons to something like this. Makes sense to put em up front.
 
+Please feel free to send PRs with more things to put in this section :)
+
 ### Cons
 
 * Dodges around the type system - there is little to no compile-time safety here.

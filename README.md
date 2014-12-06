@@ -24,6 +24,8 @@ Here's some resources - mostly in Clojure, of course:
 * Some [examples](http://ianrumford.github.io/blog/2014/08/08/Some-trivial-examples-of-using-Clojure-Transducers/) of [uses](http://matthiasnehlsen.com/blog/2014/10/06/Building-Systems-in-Clojure-2/) for transducers...mostly just toy stuff
 * A couple [blog](http://blog.podsnap.com/ducers2.html) [posts](http://conscientiousprogrammer.com/blog/2014/08/07/understanding-cloure-transducers-through-types/) examining type issues with transducers
 
+If trying to read Clojure makes your eyes cross (me too, I learned just enough to grok for this), I first learned what transducers are and how they work by reading about [this adaptation in javascript](http://phuu.net/2014/08/31/csp-and-transducers.html).
+
 ## Proof -> Pudding
 
 I'm calling this proof of concept "done" because [it can pretty much replicate](http://godoc.org/github.com/sdboyer/go-transducers#ex-package--ClojureParity) a [very thorough example](https://gist.github.com/sdboyer/9fca652f492257f35a41) Rich Hickey put out there.

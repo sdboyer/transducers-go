@@ -63,7 +63,7 @@ func t_range(l int) []int {
 func Flatten(value interface{}) ValueStream {
 	switch v := value.(type) {
 	case ValueStream:
-		return flattenValueStream(v)
+		return v.Flatten()
 	case []interface{}:
 		// TODO maybe detect ValueStreams here, too, but probably better to just be consistent
 		return valueSlice(v).AsStream()

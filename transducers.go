@@ -116,7 +116,7 @@ func (r append_bottom) Step(accum interface{}, value interface{}) (interface{}, 
 	case int:
 		return append(accum.([]int), v), false
 	case ValueStream:
-		flattenValueStream(v).Each(func(value interface{}) {
+		v.Flatten().Each(func(value interface{}) {
 			accum = append(accum.([]int), value.(int))
 		})
 		return accum, false

@@ -256,14 +256,14 @@ func TestRemove(t *testing.T) {
 }
 
 func TestFlattenValueStream(t *testing.T) {
-	stream := flattenValueStream(valueSlice{
+	stream := valueSlice{
 		ToStream([]int{0, 1}),
 		valueSlice{
 			ToStream([]int{2, 3}),
 			ToStream([]int{4, 5, 6}),
 		}.AsStream(),
 		ToStream([]int{7, 8}),
-	}.AsStream())
+	}.AsStream().Flatten()
 
 	var flattened []int
 	stream.Each(func(v interface{}) {

@@ -138,11 +138,23 @@ func StreamIntoChan(vs ValueStream, c chan<- interface{}) {
 	close(c)
 }
 
-// Takes a ValueStream that (presumably) produces other ValueStreams, and,
-// ostensibly for the caller, flattens them together into a single ValueStream
-// by walking depth-first through an arbitrarily deep set of ValueStreams until
-// actual values are found, then returning those directly out.
-func flattenValueStream(vs ValueStream) ValueStream {
+// Assuming this stream contains other streams, Flatten returns a new stream
+// that removes all nesting on the fly, flattening all the streams down into
+// the same top-level construct. It's the linearized results of a
+// depth-first tree traversal on an arbitrarily deep tree of nested streams.
+//
+// Meaning that, it a stream containing other streams looking like:
+//
+// [[1 [2 3] 4] 5 6 [7 [8 [9] [10 11]]]]
+//
+// And presents it through the returned stream as:
+//
+// [1 2 3 4 5 6 7 8 9 10 11]
+//
+// Remember - streams are forward-only, and the flattening stream wraps the
+// original source stream. Once you call this, if you consume from the original
+// source stream again, that value will be lost to the flattener.
+func (vs ValueStream) Flatten() ValueStream {
 	// create stack of streams and push the first one on
 	var ss []ValueStream
 	ss = append(ss, vs)

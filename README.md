@@ -8,27 +8,31 @@ Transducers can be tricky to understand with just an abstract description, but h
 
 > Transducers are a composable way to build reusable algorithmic transformations.
 
-Transducers were introduced in Clojure for a sorta-similar reason that `range` exists in Go: because they wanted one way of writing element-wise operations on channels *and* other collection structures (though that's just the tip of the iceberg).
+Transducers were introduced in Clojure for a sorta-similar reason that `range` exists in Go: having one way of writing element-wise operations on channels *and* other collection structures (though that's just the tip of the iceberg).
 
-I'm honestly not sure if I these are a good idea for Go or not. I've written this library as an exploratory experiment in their utility/applicability to Go, and would love feedback on transducers' utility for Go.
+I'm honestly not sure if I these are a good idea for Go. I've written this library as an exploratory experiment in their utility for Go, and would love feedback.
 
 ## What Transducers are
 
-There's a lot out there already, no need to duplicate it here. Instead, know that this library attempts to faithfully reproduce their behaviors in Go, meaning that anything about how they *ought* to work as defined elsewhere, should hold true here.
+There's a lot out there already, and I don't want to duplicate that here. Here are some bullets to quickly orient you:
 
-Here's some resources - mostly in Clojure, of course:
+* They're a framework for performing structured transformations on streams of values. If you're familiar with pipeline processing, kinda like that.
+* They separate the WAY a transformation is run (concurrently or not, eagerly or lazily) from WHAT the transformation is, while also decomposing HOW the tranformation works into its smallest possible reusable parts.
+* The **whole entire thing** is built on a single observation: you can express every possible collection-type operation (map, filter, etc.) as in the form of a reduce operation.
+* Clojure is a Lisp. Lisp, as in, "list processing". We have different-looking list primitives in Go (slices/arrays, basically). This difference is much of why transducers can be so fundamental for Clojure, but may seem foreign (though not *necessarily* wrong) in Go.
 
+Beyond that, here's some resources (mostly in Clojure):
+
+* If Clojure makes your eyes cross, here's a writeup in [Javascript](http://phuu.net/2014/08/31/csp-and-transducers.html), and one in [PHP](https://github.com/mtdowling/transducers.php). Cognitect has also [implemented transducers](http://cognitect-labs.github.io/) in Python, Javascript, Ruby, and Java.
 * Rich Hickey's [StrangeLoop talk](https://www.youtube.com/watch?v=6mTbuzafcII) introducing transducers (and his recent [ClojureConj talk](https://www.youtube.com/watch?v=4KqUvG8HPYo))
 * The [Clojure docs](http://clojure.org/transducers) page for transducers
 * [Some](https://gist.github.com/ptaoussanis/e537bd8ffdc943bbbce7) [high-level](https://bendyworks.com/transducers-clojures-next-big-idea/) [summaries](http://thecomputersarewinning.com/post/Transducers-Are-Fundamental/) of transducers
 * Some [examples](http://ianrumford.github.io/blog/2014/08/08/Some-trivial-examples-of-using-Clojure-Transducers/) of [uses](http://matthiasnehlsen.com/blog/2014/10/06/Building-Systems-in-Clojure-2/) for transducers...mostly just toy stuff
 * A couple [blog](http://blog.podsnap.com/ducers2.html) [posts](http://conscientiousprogrammer.com/blog/2014/08/07/understanding-cloure-transducers-through-types/) examining type issues with transducers
 
-If trying to read Clojure makes your eyes cross (me too, I learned just enough to grok for this), I first learned what transducers are and how they work by reading about [this adaptation in javascript](http://phuu.net/2014/08/31/csp-and-transducers.html).
-
 ## Pudding <- Proof
 
-I'm calling this proof of concept "done" because [it can pretty much replicate](http://godoc.org/github.com/sdboyer/transducers-go#ex-package--ClojureParity) a [very thorough example](https://gist.github.com/sdboyer/9fca652f492257f35a41) Rich Hickey put out there.
+I'm calling this proof of concept "done" because [it can pretty much replicate](http://godoc.org/github.com/sdboyer/transducers-go#ex-package--ClojureParity) (expand the ClojureParity example) a [thorough demo case](https://gist.github.com/sdboyer/9fca652f492257f35a41) Rich Hickey put out there.
 
 Here's some quick eye candy, though:
 
@@ -58,9 +62,10 @@ func main() {
 	go StreamIntoChan(Range(4), in_chan)
 
 	// Go provides its own bottom reducer (that's where it sends values out through
-	// the return channel). So we don't provide one - just the input channel. Note
-	// that we can safely reuse the transducer stack we declared earlier.
+	// the return channel). So we don't provide one - just the input channel.
 	out_chan := Go(in_chan, 0, transducers...)
+    // Note that we reuse the transducer stack declared for the first example.
+    // THIS. THIS is why transducers are cool.
 
 	result2 := make([]interface{}, 0) // zero out the slice
 	for v := range out_chan {
@@ -68,8 +73,11 @@ func main() {
 	}
 
 	fmt.Println(result) // [2 4]
+
 }
 ```
+
+Remember - what's important here is *not* the particular problem being solved, or the idiosyncracies of the Transduce or Go processors (you can always write your own). What's important is that we can reuse the Transducer stack we declared, and it works - regardless of eagerness vs laziness, parallelism, etc. That's what breaking down transformations into their smallest constituent parts gets us.
 
 ## The Arguments
 

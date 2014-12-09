@@ -110,7 +110,7 @@ Transducers have some jargon. Here's an attempt to cut it down. These go more or
 * **Reduce:** If you're not familiar with the general concept of reduction, [LMGTFY](http://en.wikipedia.org/wiki/Fold_(higher-order_function)).
 * **Reduce Step:** A [function](http://godoc.org/github.com/sdboyer/transducers-go#ReduceStep)/method with a reduce-like signature: `(accum, value) return`
 * **Reducer:** A [set of three](http://godoc.org/github.com/sdboyer/transducers-go#Reducer) functions - the Reduce Step, plus Complete and Init methods.
-* **Transducer:** A function that *transforms* a *reducing* function. They [take a reducing func and return another](http://godoc.org/github.com/sdboyer/transducers-go#Transducer).
+* **Transducer:** A function that *transforms* a *reducing* function. They [take a Reducer and return Reducer](http://godoc.org/github.com/sdboyer/transducers-go#Transducer).
 * **Predicate:** Some transducers - for example, [Map](http://godoc.org/github.com/sdboyer/transducers-go#Map) and [Filter](http://godoc.org/github.com/sdboyer/transducers-go#Filter) - take a function to do their work. These injected functions are referred to as predicates.
 * **Transducer stack:** In short: `[]Transducer`. A stack is stateless (it's just logic) and can be reused in as many processes as desired.
 * **Bottom reducer:** The reducer that a stack of transducers will operate on.

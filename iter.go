@@ -210,6 +210,16 @@ func ToStream(collection interface{}) ValueStream {
 		return valueSlice(c).AsStream()
 	case ValueStream:
 		return c
+	case <-chan interface{}:
+		return func() (value interface{}, done bool) {
+			value, done = <-c
+			return
+		}
+	case chan interface{}:
+		return func() (value interface{}, done bool) {
+			value, done = <-c
+			return
+		}
 	default:
 		panic("not supported...yet")
 	}

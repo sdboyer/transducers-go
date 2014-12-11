@@ -96,6 +96,7 @@ Please feel free to send PRs with more things to put in this section :)
 * The `ValueStream` notion is a bedrock for this system, and has significant flaws.
 * Since this is based on streams/sequences/iteration, there will be cases where it is unequivocally less efficient than batch processing (slices).
 * Performance in general. While Reflect is not used at all (duh), I haven't done perf analysis yet, so I'm not sure how much overhead we're looking at. The stream operations in particular (splitting, slice->stream->slice) probably mean a lot of heap allocs and duplication of data.
+* re: performance - Go's compiler evidently not that great at inlining yet, and that's rather important for collapsing down the big function stack created by functional styles.
 
 ### Pros
 

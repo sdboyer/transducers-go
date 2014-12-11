@@ -79,6 +79,8 @@ func main() {
 
 Remember - what's important here is *not* the particular problem being solved, or the idiosyncracies of the Transduce or Go processors (you can always write your own). What's important is that we can reuse the Transducer stack we declared, and it works - regardless of eagerness vs laziness, parallelism, etc. That's what breaking down transformations into their smallest constituent parts gets us.
 
+I also worked up another more sorta-real example in response to an idea on the mailing list: using transducers to [decode signals from airplane transponders](https://gist.github.com/sdboyer/4b116fd78d8bad07a9ff).
+
 ## The Arguments
 
 I figure there's pros and cons to something like this. Makes sense to put em up front.

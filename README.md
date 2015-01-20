@@ -12,6 +12,8 @@ Transducers were introduced in Clojure for a sorta-similar reason that `range` e
 
 I'm honestly not sure if I these are a good idea for Go. I've written this library as an exploratory experiment in their utility for Go, and would love feedback.
 
+**UPDATE**: After much reflection, I’m pretty sure they’re a bad idea. They’re just not worth departing the island of type-safety. Still open to being convinced otherwise :)
+
 ## What Transducers are
 
 There's a lot out there already, and I don't want to duplicate that here. Here are some bullets to quickly orient you:
